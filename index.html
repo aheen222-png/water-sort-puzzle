@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#080d24">
+<title>워터 소트 퍼즐</title>
+<style>
+/* ================= 기본 ================= */
+:root{
+  /* 병 폭: 화면 폭/높이 중 작은 쪽에 맞춰 자동 조절 (아이폰 세로 ~ 데스크톱) */
+  --bw: clamp(34px, min(12.4vw, 6.1vh), 68px);
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; height:100%; }
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",system-ui,sans-serif;
+  color:#e9efff; background:#060a1c; overflow:hidden; overscroll-behavior:none;
+  user-select:none; -webkit-user-select:none; touch-action:manipulation;
+}
+#app{
+  position:relative; display:flex; flex-direction:column;
+  height:100vh; height:100dvh;
+  padding:max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  background:
+    radial-gradient(105% 62% at 50% -8%, rgba(96,116,255,.36), rgba(96,116,255,0) 72%),
+    radial-gradient(75% 55% at 50% 108%, rgba(128,64,224,.28), rgba(128,64,224,0) 72%),
+    radial-gradient(130% 95% at 50% 42%, #1b2458 0%, #121a45 42%, #0a0e2b 76%, #05081a 100%);
+}
+/* 배경의 은은한 빛무리 */
+#app::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:
+    radial-gradient(38% 26% at 50% 30%, rgba(122,150,255,.16), rgba(122,150,255,0) 70%),
+    radial-gradient(46% 30% at 50% 74%, rgba(150,90,255,.12), rgba(150,90,255,0) 70%);
+  mix-blend-mode:screen;
+}
+
+/* ================= 상단 HUD ================= */
+.hud{
+  position:relative; z-index:12; flex:0 0 auto;
+  display:flex; align-items:center; gap:6px;
+  padding:2px 4px 0;
+}
+.hud-mid{ display:flex; align-items:center; gap:5px; margin:0 auto; }
+.pill{
+  appearance:none; -webkit-appearance:none; border:1px solid rgba(255,255,255,.15);
+  background:linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.04));
+  color:#dde6ff; font:inherit; font-size:12.5px; font-weight:650; letter-spacing:-.2px;
+  padding:7px 11px; border-radius:999px; display:inline-flex; align-items:center; gap:4px;
+  cursor:pointer; white-space:nowrap;
+  box-shadow:0 3px 12px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.14);
+  transition:transform .12s ease, background .18s ease, border-color .18s ease;
+}
+.pill:active{ transform:scale(.94); background:rgba(255,255,255,.2); }
+.pill b{ font-weight:800; color:#fff; }
+.pill.stat{ padding:5px 9px; font-size:11.5px; font-weight:600; background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.1); cursor:default; }
+.pill.stat:active{ transform:none; background:rgba(255,255,255,.06); }
+.pill.stat .dim{ opacity:.62; }
+.pill.icon{ width:32px; height:32px; padding:0; justify-content:center; }
+.pill.icon svg{ width:17px; height:17px; display:block; }
+.pill.icon .slash{ display:none; }
+.pill.icon.muted .wave{ display:none; }
+.pill.icon.muted .slash{ display:block; }
+
+/* ================= 무대 ================= */
+.stage{
+  position:relative; z-index:5; flex:1 1 auto; min-height:0;
+  display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+  align-items:center; justify-items:center;
+  column-gap:clamp(2px, 1.2vw, 16px);
+  width:100%; max-width:840px; margin:0 auto;
+  padding:4px clamp(2px, 1.4vw, 12px);
+}
+.col{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:clamp(8px, 2.1vh, 22px); width:100%; }
+.col.center{ width:auto; }
+
+/* 선반 */
+.shelf{ display:flex; flex-direction:column; align-items:stretch; width:max-content; max-width:100%; }
+.rack{ display:flex; align-items:flex-end; justify-content:center; gap:calc(var(--bw) * .10); padding:0 calc(var(--bw) * .10); }
+.plank{
+  position:relative; height:calc(var(--bw) * .17); min-height:7px; margin-top:-1px;
+  border-radius:4px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,.05) 0 7px, rgba(255,255,255,.055) 7px 14px),
+    linear-gradient(180deg, #ddb377 0%, #c8934f 26%, #9d6c36 64%, #7b4f24 100%);
+  box-shadow:0 9px 20px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,239,206,.6), inset 0 -1px 0 rgba(0,0,0,.35);
+}
+.plank::after{
+  content:""; position:absolute; left:1px; right:1px; top:100%; height:4px;
+  border-radius:0 0 4px 4px;
+  background:linear-gradient(180deg, #6d451f, #472a11);
+  box-shadow:0 2px 6px rgba(0,0,0,.4);
+}
+
+/* ================= 병 ================= */
+.bottle{
+  --cap:4;
+  position:relative; width:var(--bw);
+  --slot:calc(var(--bw) * .80);
+  display:flex; flex-direction:column; align-items:center;
+  transform-origin:50% 100%; will-change:transform;
+  transition:transform .26s cubic-bezier(.18,.9,.28,1), filter .2s ease;
+  cursor:pointer;
+}
+.bottle.tall{ width:calc(var(--bw) * .90); --slot:var(--tall-slot, calc(var(--bw) * .70)); }
+
+/* 목 */
+.neck{
+  position:relative; z-index:0; width:44%; height:calc(var(--bw) * .25);
+  margin-bottom:-2px; border-radius:4px 4px 0 0;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,.30) 38%, rgba(255,255,255,.03) 82%),
+    linear-gradient(180deg, rgba(176,206,255,.22), rgba(34,54,116,.34));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.32), inset 0 2px 0 rgba(255,255,255,.40);
+}
+.neck::before{
+  content:""; position:absolute; left:-2px; right:-2px; top:-2px; height:4px;
+  border-radius:3px;
+  background:linear-gradient(180deg, rgba(255,255,255,.62), rgba(255,255,255,.14));
+  box-shadow:0 1px 2px rgba(0,0,0,.25);
+}
+.bottle.tall .neck{ height:calc(var(--bw) * .26); width:42%; }
+
+/* 몸통(유리) */
+.body{
+  position:relative; width:100%; overflow:hidden;
+  height:calc(var(--slot) * var(--cap));
+  border-radius:22% 22% 28% 28% / 9% 9% 13% 13%;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.20), rgba(255,255,255,.03) 24%, rgba(255,255,255,0) 52%, rgba(255,255,255,.05) 74%, rgba(255,255,255,.22)),
+    linear-gradient(180deg, rgba(150,182,255,.13), rgba(96,126,224,.05) 45%, rgba(46,66,150,.10));
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.22),
+    inset 0 -10px 16px rgba(0,0,0,.22),
+    inset 0 8px 12px rgba(255,255,255,.06),
+    0 6px 16px rgba(0,0,0,.34);
+  transition:box-shadow .28s ease;
+}
+.bottle.tall .body{ border-radius:18% 18% 22% 22% / 4% 4% 6% 6%; }
+
+/* 액체 */
+.band{
+  position:absolute; left:1.5px; right:1.5px; z-index:1;
+  background-color:var(--c);
+  transition:height .27s cubic-bezier(.35,0,.25,1), bottom .27s cubic-bezier(.35,0,.25,1);
+  will-change:height;
+}
+.band::after{
+  content:""; position:absolute; inset:0;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.26) 0%, rgba(255,255,255,.20) 14%, rgba(255,255,255,.03) 38%, rgba(0,0,0,.06) 68%, rgba(0,0,0,.30) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.055), rgba(0,0,0,.05));
+}
+.band.top::before{
+  content:""; position:absolute; left:0; right:0; top:-1px; height:4px; z-index:2;
+  background:linear-gradient(180deg, rgba(255,255,255,.38), rgba(255,255,255,0));
+  border-radius:50%;
+}
+/* 유리 광택 */
+.shine{
+  position:absolute; inset:0; z-index:3; pointer-events:none; border-radius:inherit;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,.26) 0%, rgba(255,255,255,.08) 3%, rgba(255,255,255,0) 11%,
+    rgba(255,255,255,0) 68%, rgba(255,255,255,.10) 80%, rgba(255,255,255,.24) 97%, rgba(255,255,255,.06) 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.26), inset 0 6px 8px rgba(255,255,255,.07), inset 0 -12px 18px rgba(0,0,0,.16);
+}
+.tick{
+  position:absolute; inset:0; z-index:3; display:flex; align-items:center; justify-content:center;
+  font-size:calc(var(--bw) * .40); font-weight:800; color:rgba(255,255,255,.92);
+  text-shadow:0 2px 8px rgba(0,0,0,.45); opacity:0; transform:scale(.55);
+  transition:opacity .3s ease, transform .3s cubic-bezier(.2,1.5,.4,1);
+  pointer-events:none; padding-bottom:calc(var(--bw) * .1);
+}
+
+/* 상태 */
+.bottle.selected{ transform:translateY(-9px); }
+.bottle.selected .body{
+  box-shadow:
+    inset 0 0 0 2px rgba(176,214,255,.85),
+    inset 0 -10px 16px rgba(0,0,0,.2),
+    0 0 22px rgba(120,180,255,.62), 0 8px 22px rgba(0,0,0,.4);
+}
+.bottle.done .body{
+  box-shadow:
+    inset 0 0 0 1.5px rgba(186,255,214,.75),
+    inset 0 0 20px rgba(150,255,200,.22),
+    0 0 20px rgba(110,240,170,.36), 0 6px 16px rgba(0,0,0,.34);
+}
+.bottle.done .tick{ opacity:1; transform:scale(1); }
+.bottle.pouring{ transition:transform .19s cubic-bezier(.4,0,.65,1); z-index:60; }
+.bottle.return{ transition:transform .30s cubic-bezier(.2,.95,.3,1); }
+@keyframes shakeX{
+  0%,100%{ transform:translateX(0) } 20%{ transform:translateX(-4px) } 45%{ transform:translateX(4px) }
+  70%{ transform:translateX(-2px) } 88%{ transform:translateX(2px) }
+}
+.bottle.shake{ animation:shakeX .32s ease; }
+
+/* 물줄기 */
+.stream-layer{ position:fixed; inset:0; z-index:55; pointer-events:none; }
+.stream{
+  position:fixed; width:5px; margin-left:-2.5px; height:calc(var(--bw) * 1.5);
+  border-radius:3px; transform-origin:top center;
+  background:linear-gradient(180deg, var(--c) 0%, var(--c) 72%, transparent 100%);
+  filter:drop-shadow(0 0 5px rgba(255,255,255,.3));
+  animation:streamDrop .40s cubic-bezier(.2,.6,.4,1) forwards;
+}
+@keyframes streamDrop{
+  0%{ transform:scaleY(.1); opacity:0 }
+  22%{ opacity:.95 }
+  75%{ opacity:.9 }
+  100%{ transform:scaleY(1); opacity:0 }
+}
+.splash{
+  position:fixed; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%;
+  border:2px solid rgba(255,255,255,.75); animation:splashOut .38s ease-out forwards;
+}
+@keyframes splashOut{
+  0%{ transform:scale(.3); opacity:.9 } 100%{ transform:scale(1.7); opacity:0 }
+}
+
+/* ================= 하단 ================= */
+.foot{ position:relative; z-index:12; flex:0 0 auto; padding:2px 6px 4px; text-align:center; }
+.status{
+  margin:0 0 6px; font-size:11.5px; line-height:1.35; color:rgba(214,226,255,.66);
+  height:16px; overflow:hidden; letter-spacing:-.2px;
+  transition:opacity .2s ease;
+}
+.foot-btns{ display:flex; gap:8px; justify-content:center; }
+
+/* ================= 클리어 ================= */
+.overlay{
+  position:fixed; inset:0; z-index:80; display:grid; place-items:center;
+  background:radial-gradient(60% 50% at 50% 45%, rgba(60,80,190,.35), rgba(4,6,18,.78));
+  backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px);
+}
+.overlay.hidden{ display:none; }
+.card{
+  position:relative; width:min(84vw, 330px); padding:26px 22px 22px; border-radius:26px; text-align:center;
+  background:linear-gradient(175deg, #29356f, #1a2150 60%, #11163a);
+  box-shadow:0 26px 64px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.22), 0 0 0 1px rgba(255,255,255,.09);
+  animation:pop .4s cubic-bezier(.2,1.35,.4,1);
+}
+@keyframes pop{ 0%{ transform:scale(.86); opacity:0 } 100%{ transform:scale(1); opacity:1 } }
+.card .emoji{ font-size:34px; line-height:1; margin-bottom:6px; animation:bob 1.6s ease-in-out infinite; }
+@keyframes bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-6px) } }
+.card h2{ margin:0 0 6px; font-size:21px; letter-spacing:-.5px; }
+.card p{ margin:0 0 18px; font-size:12.5px; color:rgba(214,226,255,.72); }
+.btn-primary{
+  appearance:none; border:0; width:100%; padding:13px 16px; border-radius:15px;
+  font:inherit; font-size:15px; font-weight:800; letter-spacing:-.3px; color:#0b1230;
+  background:linear-gradient(180deg, #a8f0c8, #4fdca0);
+  box-shadow:0 10px 22px rgba(64,220,150,.28), inset 0 1px 0 rgba(255,255,255,.7);
+  cursor:pointer; transition:transform .12s ease;
+}
+.btn-primary:active{ transform:scale(.96); }
+.confetti{ position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+.confetti i{ position:absolute; top:-24px; width:9px; height:9px; border-radius:2px; animation:fall linear forwards; }
+@keyframes fall{ 0%{ transform:translateY(0) rotate(0deg); opacity:1 } 100%{ transform:translateY(112vh) rotate(720deg); opacity:.85 } }
+
+/* ================= 반응형 보정 ================= */
+@media (max-height:640px){
+  .status{ height:14px; font-size:10.5px; margin-bottom:4px; }
+  .pill{ padding:6px 9px; font-size:11.5px; }
+}
+@media (prefers-reduced-motion:reduce){
+  .bottle,.band,.tick,.card,.card .emoji{ transition-duration:.08s !important; animation:none !important; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="hud">
+    <button class="pill icon" id="btnSound" aria-label="소리 끄기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 9.5h3.2L12 5.6v12.8L7.2 14.5H4z" fill="currentColor" stroke="none"/>
+        <path class="wave" d="M15.6 8.6a4.8 4.8 0 0 1 0 6.8"/>
+        <path class="wave" d="M18.2 6.3a8.2 8.2 0 0 1 0 11.4"/>
+        <path class="slash" d="M15.5 9.2l5.4 5.6M20.9 9.2l-5.4 5.6"/>
+      </svg>
+    </button>
+    <div class="hud-mid">
+      <span class="pill stat">레벨 <b id="lvNum">1</b></span>
+      <span class="pill stat">이동 <b id="moveNum">0</b></span>
+      <span class="pill stat"><span class="dim">완성</span> <b id="doneNum">0</b>/<b id="totalNum">4</b></span>
+    </div>
+    <button class="pill" id="btnUndo">되돌리기</button>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="col left" id="colLeft"></div>
+    <div class="col center" id="colCenter"></div>
+    <div class="col right" id="colRight"></div>
+  </main>
+
+  <footer class="foot">
+    <p class="status" id="status">병을 눌러 고른 뒤, 다른 병을 눌러 부으세요</p>
+    <div class="foot-btns">
+      <button class="pill" id="btnRestart">다시하기</button>
+      <button class="pill" id="btnNew">새 판</button>
+    </div>
+  </footer>
+
+  <div class="stream-layer" id="streamLayer"></div>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="confetti" id="confetti"></div>
+    <div class="card">
+      <div class="emoji">✨</div>
+      <h2>스테이지 클리어!</h2>
+      <p id="clearSub">레벨 1 · 12번 만에 완성</p>
+      <button class="btn-primary" id="btnNext">다음 레벨 →</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   1. 게임 규칙 (DOM 비의존 순수 로직)
+   ===================================================================== */
+/* @@CORE-START */
+var COLORS = ['#6FDC4A', '#FF5C8A', '#FFD22E', '#3EC5F7', '#9C6BFF', '#FF8A2B', '#16D3BE', '#E75BD8'];
+var COLOR_NAMES = ['연두', '코랄', '노랑', '하늘', '보라', '주황', '청록', '자홍'];
+
+/* 시드 기반 난수 (같은 레벨 = 같은 판) */
+function mulberry32(seed) {
+  var a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    var t = a;
+    t = Math.imul(t ^ (t >>> 15), 1 | t);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* 레벨 설계: 레벨이 오르면 색이 늘고, 3레벨부터 가운데 긴 병이 등장 */
+function levelConfig(level) {
+  var colors = Math.max(4, Math.min(COLORS.length, 3 + level));   // L1 4색 → L5 8색
+  var tall = level >= 3;
+  var empties = 2;
+  var depth = Math.min(72, 14 + (level - 1) * 7);                 // 뒤섞는 횟수
+  return { colors: colors, tall: tall, empties: empties, depth: depth, level: level };
+}
+
+/* 완성 상태에서 출발하는 병들 */
+function makeBottles(cfg) {
+  var out = [], c, e;
+  for (c = 0; c < cfg.colors; c++) out.push({ cells: new Array(4).fill(c), cap: 4, tall: false });
+  for (e = 0; e < cfg.empties; e++) out.push({ cells: [], cap: 4, tall: false });
+  if (cfg.tall) out.push({ cells: [], cap: 8, tall: true });
+  return out;
+}
+
+/* 맨 위 같은 색 덩어리 */
+function topRun(cells) {
+  if (!cells.length) return { color: -1, n: 0 };
+  var c = cells[cells.length - 1], n = 0;
+  for (var i = cells.length - 1; i >= 0 && cells[i] === c; i--) n++;
+  return { color: c, n: n };
+}
+
+/* 이 병에서 저 병으로 부을 수 있는 양 (0이면 불가) */
+function pourAmount(a, b) {
+  if (!a || !b || a === b) return 0;
+  if (!a.cells.length) return 0;
+  if (b.cells.length >= b.cap) return 0;
+  var tr = topRun(a.cells);
+  if (b.cells.length && b.cells[b.cells.length - 1] !== tr.color) return 0;
+  return Math.min(tr.n, b.cap - b.cells.length);
+}
+
+/* 실제로 붓기. 부은 칸 수를 반환 */
+function applyPour(state, ai, bi) {
+  var a = state[ai], b = state[bi], n = pourAmount(a, b);
+  if (!n) return 0;
+  var color = a.cells[a.cells.length - 1];
+  for (var i = 0; i < n; i++) { a.cells.pop(); b.cells.push(color); }
+  return n;
+}
+
+function isComplete(bottle) {
+  var cells = bottle.cells;
+  if (cells.length !== bottle.cap) return false;
+  for (var i = 1; i < cells.length; i++) if (cells[i] !== cells[0]) return false;
+  return true;
+}
+
+/* 클리어 조건: 모든 병이 비었거나, 한 가지 색으로 가득 참 */
+function isWin(state) {
+  for (var i = 0; i < state.length; i++) {
+    if (state[i].cells.length === 0) continue;
+    if (!isComplete(state[i])) return false;
+  }
+  return true;
+}
+
+function countComplete(state) {
+  var n = 0;
+  for (var i = 0; i < state.length; i++) if (isComplete(state[i])) n++;
+  return n;
+}
+
+/* 한 색이 몇 개 병에 흩어져 있는지 */
+function splitColors(state) {
+  var map = new Map(), i, j, cells;
+  for (i = 0; i < state.length; i++) {
+    cells = state[i].cells;
+    for (j = 0; j < cells.length; j++) {
+      if (!map.has(cells[j])) map.set(cells[j], new Set());
+      map.get(cells[j]).add(i);
+    }
+  }
+  var split = 0;
+  map.forEach(function (set) { if (set.size > 1) split++; });
+  return split;
+}
+
+/* ---------------------------------------------------------------
+   역방향 섞기: 실제 "붓기"의 정확한 역연산만 사용하므로
+   만들어진 판은 항상 풀 수 있다. (되돌리면 곧 정답 순서)
+   역연산: 완성 상태에서 색 c를 B에서 A로 k칸 옮기되,
+           A는 비었거나 맨 위 색이 c가 아니어야 한다.
+   --------------------------------------------------------------- */
+function scramble(state, depth, rng) {
+  var moves = [], lastFrom = -1, lastTo = -1, step, bi, ai;
+
+  for (step = 0; step < depth; step++) {
+    var cands = [], total = 0;
+
+    for (bi = 0; bi < state.length; bi++) {
+      var B = state[bi];
+      var tr = topRun(B.cells);
+      if (!tr.n) continue;                                          // 옮길 액체가 없음
+
+      for (ai = 0; ai < state.length; ai++) {
+        if (ai === bi) continue;
+        var A = state[ai];
+        var aFree = A.cap - A.cells.length;
+        if (aFree < 1) continue;
+        var aLen = A.cells.length;
+        if (aLen && A.cells[aLen - 1] === tr.color) continue;      // 역연산 조건
+        if (bi === lastTo && ai === lastFrom) continue;            // 방금 한 수 되돌리기 금지
+        var maxK = Math.min(tr.n, aFree);
+        for (var k = 1; k <= maxK; k++) {
+          /* 되돌린 뒤 B에 남는 맨 위가 같은 색이거나, B가 통째로 비어야
+             정방향으로 다시 부을 수 있다 */
+          if (k === tr.n && B.cells.length > k) continue;
+          var w = k * k;                                           // 큰 이동을 선호
+          cands.push({ b: bi, a: ai, k: k, w: w });
+          total += w;
+        }
+      }
+    }
+    if (!cands.length) break;
+
+    var r = rng() * total, pick = cands[cands.length - 1], acc = 0;
+    for (var ci = 0; ci < cands.length; ci++) {
+      acc += cands[ci].w;
+      if (r <= acc) { pick = cands[ci]; break; }
+    }
+
+    var color = state[pick.b].cells[state[pick.b].cells.length - 1];
+    for (var m = 0; m < pick.k; m++) state[pick.b].cells.pop();
+    for (var n = 0; n < pick.k; n++) state[pick.a].cells.push(color);
+
+    moves.push([pick.b, pick.a, pick.k]);
+    lastFrom = pick.b; lastTo = pick.a;
+  }
+  return moves;
+}
+
+/* 레벨 생성 (항상 풀 수 있는 판) */
+function generateLevel(level, seed) {
+  var cfg = levelConfig(level);
+  var best = null;
+
+  for (var attempt = 0; attempt < 40; attempt++) {
+    var rng = mulberry32((seed + Math.imul(attempt, 2654435761)) >>> 0);
+    var state = makeBottles(cfg);
+    var moves = scramble(state, cfg.depth, rng);
+    var split = splitColors(state);
+    var done = countComplete(state);
+    var score = split * 100 + moves.length - done * 10;
+
+    var result = { bottles: state, cfg: cfg, moves: moves, attempt: attempt, split: split };
+    if (!isWin(state) && split >= cfg.colors) return result;
+    if (!best || score > best.score) { result.score = score; best = result; }
+  }
+  return best;
+}
+
+/* 무대에 올릴 순서: 일반 병은 좌/우 선반, 긴 병은 가운데 */
+function splitRows(count) {
+  var rows = Math.ceil(count / 3), out = [], rem = count, i;
+  for (i = 0; i < rows; i++) {
+    var take = Math.ceil(rem / (rows - i));
+    out.push(take); rem -= take;
+  }
+  return out;
+}
+/* @@CORE-END */
+
+/* =====================================================================
+   2. 사운드 (Web Audio API — 외부 파일 없음)
+   ===================================================================== */
+function store(key, value) {
+  try {
+    if (value === undefined) return localStorage.getItem(key);
+    localStorage.setItem(key, value);
+    return value;
+  } catch (e) { return null; }
+}
+
+var Sound = (function () {
+  var ctx = null;
+  var muted = store('wsp.muted') === '1';
+
+  function ac() {
+    if (!ctx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { ctx = new AC(); } catch (e) { return null; }
+    }
+    if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
+    return ctx;
+  }
+
+  function tone(freq, opt) {
+    opt = opt || {};
+    if (muted) return;
+    var c = ac(); if (!c) return;
+    var dur = opt.dur || 0.16, t0 = c.currentTime + (opt.delay || 0);
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = opt.type || 'sine';
+    o.frequency.setValueAtTime(freq, t0);
+    if (opt.to) o.frequency.exponentialRampToValueAtTime(Math.max(40, opt.to), t0 + dur);
+    var vol = opt.vol || 0.06;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0); o.stop(t0 + dur + 0.04);
+  }
+
+  function splash(dur, vol) {
+    if (muted) return;
+    var c = ac(); if (!c) return;
+    dur = dur || 0.30;
+    var n = Math.floor(c.sampleRate * dur);
+    var buf = c.createBuffer(1, n, c.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) {
+      var t = i / n;
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3) * (0.55 + 0.45 * Math.sin(2 * Math.PI * 26 * t));
+    }
+    var src = c.createBufferSource(); src.buffer = buf;
+    var f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1500;
+    var g = c.createGain(); g.gain.value = vol || 0.05;
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start();
+  }
+
+  return {
+    unlock: function () { ac(); },
+    isMuted: function () { return muted; },
+    toggle: function () {
+      muted = !muted;
+      store('wsp.muted', muted ? '1' : '0');
+      if (!muted) { this.pick(); }
+      return muted;
+    },
+    pick: function () { tone(720, { dur: 0.08, type: 'triangle', vol: 0.05, to: 980 }); },
+    pour: function () {
+      tone(440, { dur: 0.19, type: 'sine', vol: 0.05, to: 300 });
+      splash(0.32, 0.055);
+      tone(300, { dur: 0.13, type: 'sine', vol: 0.035, to: 400, delay: 0.07 });
+    },
+    fail: function () { tone(150, { dur: 0.13, type: 'square', vol: 0.03, to: 100 }); },
+    done: function () {
+      [660, 880, 1170].forEach(function (f, i) { tone(f, { dur: 0.24, type: 'sine', vol: 0.055, delay: i * 0.07 }); });
+    },
+    win: function () {
+      [523, 659, 784, 1046, 1318].forEach(function (f, i) {
+        tone(f, { dur: 0.34, type: 'triangle', vol: 0.055, delay: i * 0.09 });
+      });
+    }
+  };
+})();
+
+/* =====================================================================
+   3. 화면 그리기
+   ===================================================================== */
+var $ = function (sel) { return document.querySelector(sel); };
+var stageEl = $('#stage');
+var streamLayer = $('#streamLayer');
+var colLeft = $('#colLeft'), colCenter = $('#colCenter'), colRight = $('#colRight');
+var overlay = $('#overlay'), confettiEl = $('#confetti');
+var elLv = $('#lvNum'), elMove = $('#moveNum'), elDone = $('#doneNum'), elTotal = $('#totalNum');
+var elStatus = $('#status'), elClearSub = $('#clearSub');
+var btnSound = $('#btnSound');
+
+var game = {
+  level: 1, seed: 1, cfg: null, bottles: [],
+  moves: 0, history: [], selected: null, busy: false, won: false
+};
+
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+function setStatus(text) {
+  if (elStatus.textContent !== text) elStatus.textContent = text;
+}
+
+/* 병 하나 만들기 */
+function makeBottleEl(bottle) {
+  var el = document.createElement('div');
+  el.className = 'bottle' + (bottle.tall ? ' tall' : '');
+  el.dataset.id = String(bottle.id);
+  el.style.setProperty('--cap', String(bottle.cap));
+  el.innerHTML = '<div class="neck"></div><div class="body"><span class="shine"></span></div><div class="tick">✓</div>';
+  bottle.el = el;
+  bottle.bands = new Map();
+  return el;
+}
+
+/* 액체 칸 맞추기 */
+function syncBottle(bottle, animate) {
+  var el = bottle.el;
+  if (!el) return;
+  var body = el.querySelector('.body');
+  var shine = body.querySelector('.shine');
+  var slot = 100 / bottle.cap;
+  var bands = bottle.bands;
+  var i, c, band;
+
+  for (i = 0; i < bottle.cells.length; i++) {
+    c = bottle.cells[i];
+    band = bands.get(i);
+    if (band && band.dataset.color !== String(c)) { band.remove(); bands.delete(i); band = null; }
+
+    if (!band) {
+      band = document.createElement('i');
+      band.className = 'band';
+      band.dataset.color = String(c);
+      band.style.setProperty('--c', COLORS[c]);
+      band.style.bottom = (i * slot) + '%';
+      band.style.height = animate ? '0%' : slot + '%';
+      body.insertBefore(band, shine);
+      bands.set(i, band);
+      if (animate) {
+        void band.offsetHeight;          // 0%에서 시작하도록 강제 리플로우
+        band.style.height = slot + '%';
+      }
+    } else {
+      band.style.bottom = (i * slot) + '%';
+      band.style.height = slot + '%';
+    }
+  }
+
+  Array.from(bands.keys()).forEach(function (idx) {
+    if (idx >= bottle.cells.length) {
+      var b = bands.get(idx);
+      bands.delete(idx);
+      b.classList.remove('top');
+      b.style.height = '0%';
+      if (animate) setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 320);
+      else if (b.parentNode) b.parentNode.removeChild(b);
+    }
+  });
+
+  bands.forEach(function (b, idx) { b.classList.toggle('top', idx === bottle.cells.length - 1); });
+  el.classList.toggle('done', isComplete(bottle));
+}
+
+function renderAll(animate) {
+  game.bottles.forEach(function (b) {
+    if (!b.el) return;
+    Array.from(b.el.querySelectorAll('.band')).forEach(function (n) { n.parentNode.removeChild(n); });
+    b.bands = new Map();
+    syncBottle(b, !!animate);
+  });
+}
+
+/* 선반 배치 */
+function buildLayout() {
+  colLeft.innerHTML = ''; colCenter.innerHTML = ''; colRight.innerHTML = '';
+
+  var normals = game.bottles.filter(function (b) { return !b.tall; });
+  var tall = game.bottles.filter(function (b) { return b.tall; })[0] || null;
+
+  var nL = Math.ceil(normals.length / 2);
+  var groups = [normals.slice(0, nL), normals.slice(nL)];
+  var cols = [colLeft, colRight];
+
+  groups.forEach(function (list, gi) {
+    var rows = splitRows(list.length), k = 0;
+    rows.forEach(function (cnt) {
+      var shelf = document.createElement('div'); shelf.className = 'shelf';
+      var rack = document.createElement('div'); rack.className = 'rack';
+      for (var i = 0; i < cnt; i++) rack.appendChild(makeBottleEl(list[k++]));
+      var plank = document.createElement('div'); plank.className = 'plank';
+      shelf.appendChild(rack); shelf.appendChild(plank);
+      cols[gi].appendChild(shelf);
+    });
+  });
+
+  if (tall) colCenter.appendChild(makeBottleEl(tall));
+}
+
+function updateHud() {
+  elLv.textContent = String(game.level);
+  elMove.textContent = String(game.moves);
+  elDone.textContent = String(game.bottles.filter(isComplete).length);
+  elTotal.textContent = String(game.cfg ? game.cfg.colors : 0);
+  $('#btnUndo').style.opacity = game.history.length ? '1' : '.45';
+}
+
+/* 화면에 맞춰 병 크기 자동 조절 (아이폰 세로 ~ 데스크톱) */
+function fitStage() {
+  var W = stageEl.clientWidth, H = stageEl.clientHeight;
+  if (!W || !H) return;
+
+  var maxCols = 1, maxRows = 1;
+  [colLeft, colRight].forEach(function (col) {
+    var racks = col.querySelectorAll('.rack');
+    if (racks.length > maxRows) maxRows = racks.length;
+    Array.prototype.forEach.call(racks, function (r) {
+      if (r.children.length > maxCols) maxCols = r.children.length;
+    });
+  });
+
+  var tall = !!(game.cfg && game.cfg.tall);
+  var gx = 0.10;                                  // 병 간격/양끝 여백 (병 폭 대비)
+  var perSide = maxCols + (maxCols + 1) * gx;
+  var tallSpan = tall ? 0.95 + 0.14 : 0;
+  var bwW = (W - (tall ? 18 : 10)) / (2 * perSide + tallSpan);
+  var bwH = (H - (maxRows - 1) * 20 - 10) / (maxRows * 3.62);
+  var bwT = tall ? (H - 10) / 5.6 : Infinity;
+
+  var bw = Math.max(26, Math.min(bwW, bwH, bwT, 78));
+  stageEl.style.setProperty('--bw', bw.toFixed(2) + 'px');
+
+  /* 가운데 긴 병은 좌우 선반 높이에 맞춰 길게 */
+  if (tall) {
+    var sideH = Math.max(colLeft.getBoundingClientRect().height, colRight.getBoundingClientRect().height);
+    var slot = (sideH - bw * 0.26) / 8;
+    slot = Math.max(bw * 0.62, Math.min(bw * 1.18, slot));
+    stageEl.style.setProperty('--tall-slot', slot.toFixed(2) + 'px');
+  } else {
+    stageEl.style.removeProperty('--tall-slot');
+  }
+}
+
+/* =====================================================================
+   4. 조작 & 게임 진행
+   ===================================================================== */
+function bottleById(id) { return game.bottles[id]; }
+
+function clearSelected() {
+  game.bottles.forEach(function (b) { if (b.el) b.el.classList.remove('selected'); });
+  game.selected = null;
+}
+
+function shakeEl(el) {
+  if (!el) return;
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+  setTimeout(function () { el.classList.remove('shake'); }, 360);
+}
+
+function restRect(el) {
+  var t = el.style.transform, tr = el.style.transition;
+  el.style.transition = 'none';
+  el.style.transform = 'none';
+  var r = el.getBoundingClientRect();
+  el.style.transition = tr;
+  el.style.transform = t;
+  return r;
+}
+
+/* 병을 상대 병 위로 기울임 (입구가 상대 병 입구에 오도록 계산) */
+function tiltTowards(srcEl, dstEl) {
+  var a = restRect(srcEl);
+  var b = dstEl.getBoundingClientRect();
+  var dir = (b.left + b.width / 2) >= (a.left + a.width / 2) ? 1 : -1;
+  var deg = dir * 30;
+  var th = deg * Math.PI / 180;
+  var arm = a.height - 6;
+  var lipX = a.left + a.width / 2 + Math.sin(th) * arm;
+  var lipY = a.top + a.height - Math.cos(th) * arm;
+  var targetX = b.left + b.width / 2 + dir * 3;
+  var targetY = b.top - 7;
+  var tx = targetX - lipX;
+  var ty = targetY - lipY;
+
+  srcEl.classList.add('pouring');
+  srcEl.style.transform = 'translate(' + tx.toFixed(1) + 'px,' + ty.toFixed(1) + 'px) rotate(' + deg + 'deg)';
+  return { x: targetX, y: targetY };
+}
+
+function untilt(el) {
+  el.classList.remove('pouring');
+  el.classList.add('return');
+  el.style.transform = '';
+  setTimeout(function () { el.classList.remove('return'); }, 320);
+}
+
+function showStream(pt, colorIdx) {
+  var s = document.createElement('div');
+  s.className = 'stream';
+  s.style.left = pt.x + 'px';
+  s.style.top = pt.y + 'px';
+  s.style.setProperty('--c', COLORS[colorIdx]);
+  streamLayer.appendChild(s);
+
+  var ring = document.createElement('div');
+  ring.className = 'splash';
+  ring.style.left = pt.x + 'px';
+  ring.style.top = (pt.y + 12) + 'px';
+  streamLayer.appendChild(ring);
+
+  setTimeout(function () {
+    if (s.parentNode) s.parentNode.removeChild(s);
+    if (ring.parentNode) ring.parentNode.removeChild(ring);
+  }, 460);
+}
+
+function onBottleClick(id) {
+  if (game.busy || game.won) return;
+  Sound.unlock();
+
+  var b = game.bottles[id];
+  if (!b) return;
+
+  // 아무것도 안 고른 상태
+  if (game.selected === null) {
+    if (!b.cells.length) { Sound.fail(); shakeEl(b.el); setStatus('빈 병은 고를 수 없어요'); return; }
+    game.selected = id;
+    b.el.classList.add('selected');
+    Sound.pick();
+    return;
+  }
+
+  // 같은 병 다시 누르면 취소
+  if (game.selected === id) { clearSelected(); return; }
+
+  var from = game.bottles[game.selected];
+  var amount = pourAmount(from, b);
+
+  if (amount > 0) {
+    var fromId = game.selected;
+    clearSelected();
+    doPour(fromId, id, amount);
+    return;
+  }
+
+  // 못 부으면: 새 병을 선택하거나 해제
+  clearSelected();
+  Sound.fail();
+  shakeEl(b.el);
+  setStatus(b.cells.length >= b.cap ? '병이 가득 찼어요' : '맨 위 색이 같아야 부을 수 있어요 (빈 병은 언제나 가능)');
+
+  if (b.cells.length) {
+    game.selected = id;
+    b.el.classList.add('selected');
+  }
+}
+
+async function doPour(fromId, toId, amount) {
+  game.busy = true;
+  var from = game.bottles[fromId], to = game.bottles[toId];
+  var color = from.cells[from.cells.length - 1];
+
+  game.history.push(game.bottles.map(function (b) { return b.cells.slice(); }));
+  if (game.history.length > 250) game.history.shift();
+
+  Sound.pour();
+  var pt = tiltTowards(from.el, to.el);
+  await sleep(190);
+
+  for (var i = 0; i < amount; i++) { from.cells.pop(); to.cells.push(color); }
+  game.moves++;
+  updateHud();
+  syncBottle(from, true);
+  syncBottle(to, true);
+  showStream(pt, color);
+
+  if (isComplete(to)) setTimeout(function () { Sound.done(); }, 240);
+
+  await sleep(310);
+  untilt(from.el);
+  await sleep(250);
+
+  game.busy = false;
+
+  if (isWin(game.bottles)) onWin();
+  else if (isComplete(to)) setStatus('한 색을 다 모았어요!');
+}
+
+function undo() {
+  if (game.busy || !game.history.length) return;
+  var snap = game.history.pop();
+  game.bottles.forEach(function (b, i) { b.cells = snap[i].slice(); });
+  game.moves = Math.max(0, game.moves - 1);
+  clearSelected();
+  renderAll(false);
+  updateHud();
+  Sound.pick();
+  setStatus('한 수 되돌렸어요');
+}
+
+function onWin() {
+  game.won = true;
+  clearSelected();
+  Sound.win();
+
+  var next = game.level + 1;
+  store('wsp.level', String(next));
+  store('wsp.seed', String(Math.floor(Math.random() * 1e9)));
+
+  setTimeout(function () {
+    elClearSub.textContent = '레벨 ' + game.level + ' · ' + game.moves + '번 만에 완성';
+    overlay.classList.remove('hidden');
+    spawnConfetti();
+  }, 420);
+}
+
+function spawnConfetti() {
+  confettiEl.innerHTML = '';
+  for (var i = 0; i < 36; i++) {
+    var p = document.createElement('i');
+    p.style.left = (4 + Math.random() * 92) + '%';
+    p.style.background = COLORS[i % COLORS.length];
+    p.style.width = p.style.height = (5 + Math.random() * 8).toFixed(0) + 'px';
+    p.style.opacity = (0.65 + Math.random() * 0.35).toFixed(2);
+    p.style.animationDuration = (1.9 + Math.random() * 1.6).toFixed(2) + 's';
+    p.style.animationDelay = (Math.random() * 0.7).toFixed(2) + 's';
+    p.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    confettiEl.appendChild(p);
+  }
+}
+
+function startLevel(level, seed) {
+  game.level = Math.max(1, level | 0);
+  game.seed = (seed >>> 0) || 1;
+
+  var gen = generateLevel(game.level, game.seed);
+  gen.bottles.forEach(function (b, i) { b.id = i; });
+
+  game.cfg = gen.cfg;
+  game.bottles = gen.bottles;
+  game.moves = 0;
+  game.history = [];
+  game.selected = null;
+  game.busy = false;
+  game.won = false;
+
+  buildLayout();
+  fitStage();
+  renderAll(false);
+  updateHud();
+  overlay.classList.add('hidden');
+
+  store('wsp.level', String(game.level));
+  store('wsp.seed', String(game.seed));
+
+  setStatus(game.cfg.tall
+    ? '가운데 긴 병은 임시 보관용 — 마지막엔 비어 있어야 해요'
+    : '병을 눌러 고른 뒤, 다른 병을 눌러 부으세요');
+
+  window.scrollTo(0, 0);
+}
+
+/* =====================================================================
+   5. 이벤트 연결 & 시작
+   ===================================================================== */
+stageEl.addEventListener('click', function (ev) {
+  var el = ev.target.closest ? ev.target.closest('.bottle') : null;
+  if (!el) return;
+  onBottleClick(Number(el.dataset.id));
+});
+
+$('#btnUndo').addEventListener('click', undo);
+
+$('#btnRestart').addEventListener('click', function () {
+  if (game.busy) return;
+  startLevel(game.level, game.seed);
+  Sound.pick();
+  setStatus('같은 판을 처음부터 다시 시작해요');
+});
+
+$('#btnNew').addEventListener('click', function () {
+  if (game.busy) return;
+  startLevel(game.level, Math.floor(Math.random() * 1e9) + 1);
+  Sound.pick();
+  setStatus('새 판을 섞었어요');
+});
+
+$('#btnNext').addEventListener('click', function () {
+  overlay.classList.add('hidden');
+  startLevel(game.level + 1, Math.floor(Math.random() * 1e9) + 1);
+  Sound.pick();
+});
+
+btnSound.addEventListener('click', function () {
+  var muted = Sound.toggle();
+  btnSound.classList.toggle('muted', muted);
+  btnSound.setAttribute('aria-label', muted ? '소리 켜기' : '소리 끄기');
+  store('wsp.muted', muted ? '1' : '0');
+});
+
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden) Sound.unlock();
+});
+
+var resizeTimer = 0;
+function onResize() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function () { fitStage(); }, 120);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
+
+(function init() {
+  btnSound.classList.toggle('muted', Sound.isMuted());
+
+  var savedLevel = parseInt(store('wsp.level') || '1', 10);
+  if (!isFinite(savedLevel) || savedLevel < 1) savedLevel = 1;
+  var savedSeed = parseInt(store('wsp.seed') || '0', 10);
+  if (!isFinite(savedSeed) || savedSeed <= 0) savedSeed = Math.floor(Math.random() * 1e9) + 1;
+
+  startLevel(savedLevel, savedSeed);
+})();
+
+/* ---- 개발/검증용 디버그 훅 (화면에는 영향 없음) ---- */
+window.__wsp = {
+  go: function (level, seed) { startLevel(level, seed || Math.floor(Math.random() * 1e9) + 1); },
+  state: function () {
+    return {
+      level: game.level, seed: game.seed, moves: game.moves, won: game.won, busy: game.busy,
+      bottles: game.bottles.map(function (b) { return { cells: b.cells.slice(), cap: b.cap, tall: b.tall }; }),
+      win: isWin(game.bottles)
+    };
+  },
+  /* 생성기 전수 검증: 모든 레벨/시드의 판이 '실제 규칙'으로 풀리는지 확인 */
+  selfTest: function (levels, seeds) {
+    levels = levels || 12; seeds = seeds || 30;
+    var report = [], allOk = true, minMoves = Infinity, maxMoves = 0;
+    for (var L = 1; L <= levels; L++) {
+      for (var s = 1; s <= seeds; s++) {
+        var seed = s * 7919 + L * 104729;
+        var g = generateLevel(L, seed);
+        var st = g.bottles.map(function (b) { return { cells: b.cells.slice(), cap: b.cap }; });
+        var alreadyWon = isWin(st);
+        var replayOk = true, steps = 0;
+        for (var i = g.moves.length - 1; i >= 0; i--) {
+          var mv = g.moves[i];
+          var amt = applyPour(st, mv[1], mv[0]);      // 역연산이므로 정방향은 A→B
+          if (amt !== mv[2]) { replayOk = false; break; }
+          steps++;
+        }
+        var solved = isWin(st);
+        var ok = replayOk && solved && !alreadyWon;
+        if (!ok) allOk = false;
+        if (steps < minMoves) minMoves = steps;
+        if (steps > maxMoves) maxMoves = steps;
+        if (L <= 3 && s <= 3) {
+          report.push({ level: L, seed: seed, bottles: g.bottles.length, colors: g.cfg.colors, tall: g.cfg.tall, scramble: g.moves.length, replay: steps, ok: ok });
+        }
+      }
+    }
+    return { allOk: allOk, minMoves: minMoves, maxMoves: maxMoves, samples: report };
+  }
+};
+</script>
+</body>
+</html>
