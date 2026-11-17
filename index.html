@@ -325,9 +325,11 @@ body{
   .bottle,.band,.tick,.card,.card .emoji{ transition-duration:.08s !important; animation:none !important; }
 }
 /* @@ROOM-CSS-START @@ */
-.coin-svg{ width:13px; height:13px; display:block; flex:0 0 auto; }
+.coin-svg{ width:13px; height:13px; display:inline-block; vertical-align:-2px; flex:0 0 auto; }
+.item .pr .coin-svg, .roomup .pr .coin-svg{ margin-right:2px; }
 .coin-gain .coin-svg{ width:15px; height:15px; }
-.pill.coin .coin-svg{ width:14px; height:14px; }
+.pill.coin .coin-svg{ width:14px; height:14px; display:block; }
+.rpill.coin .coin-svg{ display:block; }
 
 /* ================= HUD 보강 (코인·내 방) ================= */
 .hud{ gap:5px; }
