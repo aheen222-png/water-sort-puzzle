@@ -473,6 +473,8 @@ body{
   background:linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.025));
 }
 .roomup.on{ border-color:rgba(255,225,140,.85); background:linear-gradient(180deg, rgba(255,210,110,.14), rgba(255,210,110,.04)); }
+.roomup.have{ border-color:rgba(140,235,190,.5); }
+.roomup.have .pr{ color:#9ff0c8; }
 .roomup .pv{
   flex:0 0 auto; width:104px; border-radius:11px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,.4);
   border:1px solid rgba(255,255,255,.12);
@@ -2309,12 +2311,14 @@ var Room = (function () {
     return o;
   }
 
-  var RS = { coins: 0, grade: 1, pets: [], lead: 0, owned: {}, equipped: defaultEquipped() };
+  var RS = { coins: 0, grade: 1, maxGrade: 1, pets: [], lead: 0, owned: {}, equipped: defaultEquipped() };
   var curTab = 'pets';
   var decoSlot = 'wall';
   var preview = null;
+  var gradePreview = 0;      /* 아직 못 가 본 방 미리보기 (방 단계) */
   var welcomePending = 0;
   var refundPending = 0, refundNames = '';
+  var refundGradePending = 0;   /* 방 이사 취소 환불 금액 (아직 안 띄웠으면 0보다 큼) */
   var resetPending = 0;      /* 600코인 환불 + 방 초기화 토스트 (아직 안 띄웠으면 1) */
   var lastAwardKey = '';
 
@@ -2324,6 +2328,7 @@ var Room = (function () {
   function save() {
     store('wsp.coins', String(RS.coins));
     store('wsp.room.grade', String(RS.grade));
+    store('wsp.room.mg', String(RS.maxGrade));
     store('wsp.room.owned', JSON.stringify(RS.owned));
     store('wsp.room.equipped', JSON.stringify(RS.equipped));
     store('wsp.room.pets', JSON.stringify(RS.pets));
@@ -2397,6 +2402,26 @@ var Room = (function () {
       resetPending = 600;
     }
 
+    /* 지금까지 해금한 최고 방 — 친구 수 상한은 이 값을 따른다 (예전 방으로 돌아가도 유지) */
+    RS.maxGrade = Math.min(GRADE_MAX, Math.max(RS.grade, num(store('wsp.room.mg'), RS.grade)));
+
+    /* ---- 1회성: 방 이사 취소 환불 ----
+       미리보기 없이 눌러 결제되던 시절에 올린 방 값을 전액 돌려주고 1단계로 되돌린다.
+       퍼즐 레벨·입양한 친구(이름 포함)는 그대로 둔다. */
+    if (store('wsp.room.rf_grade_back') === null) {
+      store('wsp.room.rf_grade_back', '1');
+      if (RS.maxGrade > 1) {
+        var gsum = 0, gi;
+        for (gi = 2; gi <= RS.maxGrade; gi++) gsum += RG[gi - 1].price;
+        if (gsum > 0) {
+          RS.coins += gsum;
+          RS.grade = 1;
+          RS.maxGrade = 1;
+          refundGradePending = gsum;
+        }
+      }
+    }
+
     /* 펫 목록 — 새 저장 형식(wsp.room.pets), 없으면 예전 1마리 저장에서 이사 */
     var pets = readJSON('wsp.room.pets', null);
     RS.pets = [];
@@ -2437,8 +2462,10 @@ var Room = (function () {
 
   function breedById(id) { for (var i = 0; i < BREEDS.length; i++) if (BREEDS[i].id === id) return BREEDS[i]; return null; }
   function breedImg(id) { return (breedById(id) || BREEDS[0]).id + '.webp'; }
-  function capacity() { return RG[RS.grade - 1].cap; }
+  function capacity() { return RG[RS.maxGrade - 1].cap; }
   function petsAtCap() { return RS.pets.length >= capacity(); }
+  /* 화면 표시용 상한 — 환불로 방이 1단계가 돼도 이미 사는 친구가 쫓겨나 보이지 않게 */
+  function capShown() { return Math.max(capacity(), RS.pets.length); }
   function hasBreed(id) { for (var i = 0; i < RS.pets.length; i++) if (RS.pets[i].breed === id) return true; return false; }
   function adoptPrice(b) { return RS.pets.length === 0 ? 0 : b.price; }
   function leadIndex() { return Math.min(Math.max(0, RS.lead), Math.max(0, RS.pets.length - 1)); }
@@ -2712,7 +2739,9 @@ var Room = (function () {
       '<rect x="78" y="66" width="6" height="8" rx="1" fill="#DEC49C"/>' +
     '</g>';
   }
-  function artBedThrone(u) {
+  /* 황금 왕좌 — 등받이(뒤)와 좌판·팔걸이·다리(앞)를 나눠 그린다.
+     가운데에 앉은 대표 친구를 사이에 끼워 등받이는 뒤로, 팔걸이는 앞으로 감싸게. */
+  function artThroneBack(u) {
     return '<g>' +
       '<path d="M24 62V28q26-26 52 0v34z" fill="url(#' + u + 'gold)"/>' +
       '<path d="M31 60V30q19-20 38 0v30z" fill="#A3223B"/>' +
@@ -2720,14 +2749,19 @@ var Room = (function () {
       '<circle cx="50" cy="6" r="5" fill="url(#' + u + 'gold)"/>' +
       '<circle cx="50" cy="6" r="2" fill="#FFE9A8"/>' +
       '<path d="M50 1.2V0" stroke="url(#' + u + 'gold)" stroke-width="2"/>' +
-      '<rect x="13" y="48" width="74" height="8" rx="4" fill="url(#' + u + 'gold)"/>' +
-      '<path d="M15 48v-7a4 4 0 0 1 8 0v7M69 48v-7a4 4 0 0 1 8 0v7" fill="url(#' + u + 'gold)"/>' +
+    '</g>';
+  }
+  function artThroneFront(u) {
+    return '<g>' +
+      '<rect x="13" y="49" width="74" height="6" rx="3" fill="url(#' + u + 'gold)"/>' +
+      '<path d="M15 49v-7a4 4 0 0 1 8 0v7M69 49v-7a4 4 0 0 1 8 0v7" fill="url(#' + u + 'gold)"/>' +
       '<rect x="24" y="55" width="52" height="10" rx="3" fill="#B72B44"/>' +
       '<path d="M24 55h52" stroke="#FFE9A8" stroke-width="1" opacity=".45"/>' +
       '<rect x="22" y="65" width="8" height="9" rx="1" fill="url(#' + u + 'gold)"/>' +
       '<rect x="70" y="65" width="8" height="9" rx="1" fill="url(#' + u + 'gold)"/>' +
     '</g>';
   }
+  function artBedThrone(u) { return artThroneBack(u) + artThroneFront(u); }
   function artBulb(u) {
     return '<g>' +
       '<ellipse cx="50" cy="30" rx="34" ry="26" fill="url(#' + u + 'glow)"/>' +
@@ -2884,23 +2918,51 @@ var Room = (function () {
       body: '<rect width="40" height="40" fill="#F6DFA6"/><path d="M20 4l11 16-11 16-11-16z" fill="#DFBB6C" opacity=".45"/><path d="M20 9l7 11-7 11-7-11z" fill="#F6E6BC" opacity=".8"/><circle cx="20" cy="20" r="2.2" fill="#FFF3C8"/>' }
   };
 
+  /* 벽지가 칠해질 벽면 — 창문(가운데)·바닥(아래)·천장(위)은 건드리지 않는다.
+     방 그림의 원근에 맞춘 좌우 벽 사다리꼴. */
+  var WALL_PANELS = '0,12 76,34 100,168 0,182';
+  var WALL_PANELS_R = '360,12 284,34 260,168 360,182';
+
   function wallDefs(id, u) {
     var w = WALLS[id];
     if (!w) return '';
     var s = '<pattern id="' + u + 'wp" patternUnits="userSpaceOnUse" width="' + w.pw + '" height="' + w.ph + '">' + w.body + '</pattern>';
     if (w.over) s += '<pattern id="' + u + 'wo" patternUnits="userSpaceOnUse" width="' + w.ow + '" height="' + w.oh + '">' + w.over + '</pattern>';
-    s += '<linearGradient id="' + u + 'wg" x1="0" y1="0" x2="0" y2="1">' +
-         '<stop offset="0" stop-color="#fff"/><stop offset=".74" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>' +
-         '<mask id="' + u + 'wm" maskUnits="userSpaceOnUse" x="0" y="0" width="360" height="176">' +
-         '<rect x="0" y="0" width="360" height="176" fill="url(#' + u + 'wg)"/></mask>';
+    s += '<linearGradient id="' + u + 'wv" x1="0" y1="0" x2="0" y2="1">' +
+         '<stop offset="0" stop-color="#fff" stop-opacity="0"/>' +
+         '<stop offset=".16" stop-color="#fff" stop-opacity="1"/>' +
+         '<stop offset=".78" stop-color="#fff" stop-opacity="1"/>' +
+         '<stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+         '<mask id="' + u + 'wm" maskUnits="userSpaceOnUse" x="0" y="0" width="360" height="240">' +
+           '<g fill="url(#' + u + 'wv)">' +
+             '<polygon points="' + WALL_PANELS + '"/>' +
+             '<polygon points="' + WALL_PANELS_R + '"/>' +
+           '</g>' +
+         '</mask>' +
+         /* 벽면 위의 빛 — 위는 밝고 아래로 갈수록 짙게 */
+         '<linearGradient id="' + u + 'wl" x1="0" y1="0" x2="0" y2="1">' +
+           '<stop offset="0" stop-color="#fff" stop-opacity=".22"/>' +
+           '<stop offset=".5" stop-color="#000" stop-opacity="0"/>' +
+           '<stop offset="1" stop-color="#000" stop-opacity=".26"/>' +
+         '</linearGradient>';
     return s;
   }
+
   function wallLayer(id, u) {
     var w = WALLS[id];
     if (!w) return '';
+    var op = w.wallOp == null ? .9 : w.wallOp;
     var s = '<g mask="url(#' + u + 'wm)">' +
-            '<rect x="0" y="0" width="360" height="176" fill="url(#' + u + 'wp)" opacity="' + w.op + '" style="mix-blend-mode:multiply"/></g>';
-    if (w.over) s += '<g mask="url(#' + u + 'wm)" opacity="' + (w.overOp || 1) + '"><rect x="0" y="0" width="360" height="176" fill="url(#' + u + 'wo)"/></g>';
+      '<rect x="0" y="0" width="360" height="190" fill="url(#' + u + 'wp)" opacity="' + op + '"/>' +
+      '<rect x="0" y="0" width="360" height="190" fill="url(#' + u + 'wl)"/>' +
+      /* 벽지 끝단에 얇은 몰딩선 — 벽 인테리어처럼 보이게 */ +
+      '<path d="M76 34L100 168" stroke="rgba(255,255,255,.35)" stroke-width=".8" fill="none"/>' +
+      '<path d="M284 34L260 168" stroke="rgba(255,255,255,.35)" stroke-width=".8" fill="none"/>' +
+      '</g>';
+    if (w.over) {
+      s += '<g mask="url(#' + u + 'wm)" opacity="' + (w.overOp || 1) + '">' +
+           '<rect x="0" y="0" width="360" height="190" fill="url(#' + u + 'wo)"/></g>';
+    }
     return s;
   }
 
@@ -3194,18 +3256,30 @@ var Room = (function () {
   /* =====================================================================
      장면 조립 — 일러스트 방 + 투명 PNG 펫 + 이름표 + 꾸미기 아이템
      ===================================================================== */
-  var BED_FIT = { x: 10, y: 236, s: 0.82 };
-  var FRAME_FIT = { a: 'center', x: 256, y: 56, s: 0.56 };
-  var RUG_FIT = { x: 132, y: 220, w: 2.05, h: 0.62 };
-  var DECO_FIT = { a: 'bottom', x: 322, y: 232, s: 0.74 };
+  /* ---------- 무대 좌표 (360×240) ----------
+     가구·소품은 밑동(bottom)을 바닥선에 맞춰 놓는다 — 공중에 뜨지 않게. */
+  var FLOOR_Y = 218;                              /* 앞쪽 바닥 기준선 */
+  /* 침대 그림의 실제 밑동 (100×100 상자 기준 y) */
+  var BED_BOT = { bed_box: 68, bed_blanket: 70, bed_cushion: 74, bed_wood: 85, bed_sofa: 92,
+                  bed_canopy: 74, bed_cloud: 88, bed_throne: 74 };
+  /* 방 왼쪽 가구 자리 — 일반 침대 */
+  var SIDE_BED = { cx: 50, s: 0.88, floor: FLOOR_Y - 4 };
+  /* 방 가운데 주인공 자리 — 라면 박스·황금 왕좌 */
+  var CENTER_BED = { cx: 180, floor: FLOOR_Y + 2 };
+  var CENTER_BED_ART = { bed_box: { bot: 68, s: 1.18 }, bed_throne: { bot: 74, s: 1.54 } };
+  var FRAME_FIT = { a: 'center', x: 60, y: 60, s: 0.52 };
+  var RUG_FIT = { cx: 180, base: 236, sx: 2.48, sy: 0.70 };
+  var DECO_FIT = { cx: 322, s: 0.62, floor: FLOOR_Y + 6 };
+  var DECO_BOT = { deco_none: 100, deco_plant: 88, deco_shelf: 100, deco_cushion: 96,
+                   deco_basket: 92, deco_gramophone: 98, deco_aquarium: 98 };
   var LIGHT_FIT = {
-    light_bulb:      { a: 'top',    x: 316, y: 0,   s: 0.58 },
-    light_lantern:   { a: 'top',    x: 316, y: 0,   s: 0.54 },
-    light_paper:     { a: 'top',    x: 316, y: 0,   s: 0.62 },
-    light_globe:     { a: 'top',    x: 316, y: 0,   s: 0.58 },
-    light_neon:      { a: 'center', x: 316, y: 56,  s: 0.50 },
-    light_chandelier: { a: 'top',   x: 316, y: 0,   s: 0.52 },
-    light_stand:     { a: 'bottom', x: 114, y: 214, s: 0.52 }
+    light_bulb:      { a: 'top',    x: 180, y: -1,  s: 0.74 },
+    light_lantern:   { a: 'top',    x: 180, y: -1,  s: 0.70 },
+    light_paper:     { a: 'top',    x: 180, y: -1,  s: 0.76 },
+    light_globe:     { a: 'top',    x: 180, y: -1,  s: 0.72 },
+    light_neon:      { a: 'center', x: 300, y: 66,  s: 0.52 },
+    light_chandelier: { a: 'top',   x: 180, y: -1,  s: 0.66 },
+    light_stand:     { a: 'floor',  x: 100, bot: 92, floor: FLOOR_Y + 4, s: 0.56 }
   };
 
   /* 모자: 펫 폭(w) 대비 상대 배치. a='base'는 모자 밑동, a='center'는 눈높이 */
@@ -3224,7 +3298,7 @@ var Room = (function () {
     outfit_tux:  { y: 0.538, ay: 0, s: 0.80, dy: 0.634, ds: 0.88 },
     outfit_cape: { y: 0.532, ay: 0, s: 0.94, dy: 0.628, ds: 1.00 }
   };
-  /* 라면 박스에 들어간 고양이 — art 100×100 기준 (앞판 윗선 43) */
+  /* 라면 박스에 들어간 고양이 — art 100×100 기준 (앞판 윗선 50) */
   var BOX_CAT = { artW: 88, artBottom: 66, rimArt: 50 };
 
   /* 펫 자리 — 마리 수별 좌표(x: 중심, b: 발바닥 y, w: 펫 크기) */
@@ -3234,6 +3308,13 @@ var Room = (function () {
     3: [{ x: 108, b: 212, w: 88 },  { x: 196, b: 221, w: 88 },  { x: 284, b: 211, w: 88 }],
     4: [{ x: 86,  b: 212, w: 78 },  { x: 158, b: 221, w: 78 },  { x: 230, b: 211, w: 78 },  { x: 302, b: 221, w: 78 }],
     5: [{ x: 68,  b: 212, w: 68 },  { x: 128, b: 221, w: 68 },  { x: 190, b: 210, w: 68 },  { x: 250, b: 221, w: 68 },  { x: 312, b: 212, w: 68 }]
+  };
+  /* 가운데 주인공(박스·왕좌)이 있을 때 나머지 친구 자리 — 좌우·앞으로 비켜 앉는다 */
+  var REST_SLOTS = {
+    1: [{ x: 276, b: 228, w: 96 }],
+    2: [{ x: 58,  b: 216, w: 92 }, { x: 278, b: 226, w: 92 }],
+    3: [{ x: 52,  b: 214, w: 76 }, { x: 284, b: 220, w: 76 }, { x: 116, b: 238, w: 62 }],
+    4: [{ x: 46,  b: 212, w: 68 }, { x: 110, b: 234, w: 60 }, { x: 258, b: 236, w: 60 }, { x: 300, b: 214, w: 64 }]
   };
 
   function esc(t) {
@@ -3248,7 +3329,8 @@ var Room = (function () {
   function place(id, fit, extra) {
     var f = fit, t;
     if (!f) return art(id, extra);
-    if (f.a === 'bottom') t = 'translate(' + f.x + ',' + f.y + ') scale(' + f.s + ') translate(-50,-100)';
+    if (f.a === 'floor') t = floorT(f.x, f.s, f.bot, f.floor);
+    else if (f.a === 'bottom') t = 'translate(' + f.x + ',' + f.y + ') scale(' + f.s + ') translate(-50,-100)';
     else if (f.a === 'top') t = 'translate(' + f.x + ',' + f.y + ') scale(' + f.s + ') translate(-50,0)';
     else t = 'translate(' + f.x + ',' + f.y + ') scale(' + f.s + ') translate(-50,-50)';
     return '<g transform="' + t + '">' + art(id, extra) + '</g>';
@@ -3266,9 +3348,27 @@ var Room = (function () {
 
   function tagFs(n) { return n >= 5 ? 7.4 : (n === 4 ? 8 : (n === 3 ? 8.7 : (n === 2 ? 9.6 : 11))); }
 
-  function bedT() { return 'translate(' + BED_FIT.x + ',' + BED_FIT.y + ') scale(' + BED_FIT.s + ') translate(0,-100)'; }
-  function artX(ax) { return BED_FIT.x + BED_FIT.s * ax; }
-  function artY(ay) { return BED_FIT.y + BED_FIT.s * (ay - 100); }
+  /* 바닥에 놓는 그림 — 100×100 상자의 art y=bot 지점이 바닥선(floorY)에 닿게 놓는다 */
+  function floorT(cx, s, bot, floorY) {
+    var y = floorY + s * (100 - (bot == null ? 100 : bot));
+    return 'translate(' + cx + ',' + y.toFixed(2) + ') scale(' + s + ') translate(-50,-100)';
+  }
+  /* 가운데 침대(박스·왕좌) 배치값 → art 좌표 변환 */
+  function centerFit(bedId) {
+    var a = CENTER_BED_ART[bedId] || { bot: BED_BOT[bedId] || 70, s: 1 };
+    var y = CENTER_BED.floor + a.s * (100 - a.bot);
+    return {
+      s: a.s, bot: a.bot, y: y, t: floorT(CENTER_BED.cx, a.s, a.bot, CENTER_BED.floor),
+      x: function (ax) { return CENTER_BED.cx + a.s * (ax - 50); },
+      ay: function (ay) { return y + a.s * (ay - 100); }
+    };
+  }
+  function isCenterBed(id) { return id === 'bed_box' || id === 'bed_throne'; }
+  /* 바닥에 놓인 물건 밑동에 까는 접촉 그림자 — 공중에 뜬 느낌을 없앤다 */
+  function floorShadow(cx, rx, y, op) {
+    return '<ellipse cx="' + cx + '" cy="' + y + '" rx="' + rx + '" ry="' + (rx * 0.17).toFixed(1) +
+           '" fill="#170f22" opacity="' + (op == null ? .2 : op) + '"/>';
+  }
   function firstCatIndex(pets) {
     for (var i = 0; i < pets.length; i++) {
       var b = breedById(pets[i].breed);
@@ -3325,43 +3425,70 @@ var Room = (function () {
     var n = Math.min(5, pets.length);
     var lead = typeof o.lead === 'number' ? o.lead : 0;
     var bedId = o.bed || 'bed_box';
-    /* 기본 침대(라면 박스) + 고양이가 있으면 첫 고양이는 박스 속으로 */
-    var boxIdx = bedId === 'bed_box' ? firstCatIndex(pets) : -1;
-    var boxW = BED_FIT.s * BOX_CAT.artW, boxB = artY(BOX_CAT.artBottom), boxCx = artX(50), boxRim = artY(BOX_CAT.rimArt);
+    var center = isCenterBed(bedId);
+    /* 가운데 주인공 자리에 누가 앉는가 —
+       라면 박스: 첫 고양이가 박스 속 / 황금 왕좌: 대표 친구가 위에 */
+    var centerIdx = -1;
+    if (bedId === 'bed_box') centerIdx = firstCatIndex(pets);
+    else if (bedId === 'bed_throne' && n) centerIdx = (lead >= 0 && lead < n) ? lead : 0;
+    var cf = center ? centerFit(bedId) : null;
+    var boxW = cf ? cf.s * BOX_CAT.artW : 0;
+    var boxB = cf ? cf.ay(BOX_CAT.artBottom) : 0;
+    var boxRim = cf ? cf.ay(BOX_CAT.rimArt) : 0;
     var s = '<defs>' + artDefs(u) + wallDefs(o.wall, u);
-    if (boxIdx >= 0) {
-      s += '<clipPath id="' + u + 'bc"><rect x="' + artX(6).toFixed(1) + '" y="0" width="' + (BED_FIT.s * 88).toFixed(1) + '" height="' + boxRim.toFixed(1) + '"/></clipPath>';
+    if (bedId === 'bed_box' && centerIdx >= 0) {
+      s += '<clipPath id="' + u + 'bc"><rect x="' + cf.x(6).toFixed(1) + '" y="0" width="' + (cf.s * 88).toFixed(1) + '" height="' + boxRim.toFixed(1) + '"/></clipPath>';
     }
     s += '</defs>';
     s += baseRoom(u, o.grade);
-    /* 벽지 — 방 그림 위에 겹쳐 깔린다 */
+    /* 벽지 — 좌우 벽면에만 포인트로 (창문·바닥·천장은 건드리지 않는다) */
     s += wallLayer(o.wall, u);
-    /* 액자 (벽) */
+    /* 액자 (벽면 눈높이) */
     if (o.frame && o.frame !== 'frame_empty') s += place(o.frame, FRAME_FIT, u);
-    /* 조명 (천장·바닥) */
-    if (o.light && LIGHT_FIT[o.light]) s += place(o.light, LIGHT_FIT[o.light], u);
-    /* 리그 (바닥) */
+    /* 천장 조명 — 천장 상단 정중앙에 줄을 매달아 내린다 */
+    if (o.light && LIGHT_FIT[o.light] && LIGHT_FIT[o.light].a !== 'floor') s += place(o.light, LIGHT_FIT[o.light], u);
+    /* 러그 — 가운데 친구/박스/왕좌 발밑에 깐다 */
     if (o.rug && o.rug !== 'rug_none') {
-      s += '<g transform="translate(' + RUG_FIT.x + ',' + RUG_FIT.y + ') scale(' + RUG_FIT.w + ',' + RUG_FIT.h + ') translate(0,-100)">' + art(o.rug, u) + '</g>';
+      s += '<g transform="translate(' + (RUG_FIT.cx - RUG_FIT.sx * 50) + ',' + RUG_FIT.base + ') scale(' + RUG_FIT.sx + ',' + RUG_FIT.sy + ') translate(0,-100)">' + art(o.rug, u) + '</g>';
     }
-    /* 침대 (왼쪽 바닥) — 라면 박스는 뒤판·고양이·앞판 순서로 */
-    if (boxIdx >= 0) s += '<g transform="' + bedT() + '">' + artBedBoxBack() + '</g>';
-    else s += '<g transform="' + bedT() + '">' + art(bedId, u) + '</g>';
+    /* 침대·왕좌 (바닥) */
+    if (center) {
+      /* 뒤판 → (주인공) → 앞판 순서로 겹쳐 그려 가운데에 앉힌다 */
+      s += floorShadow(CENTER_BED.cx, 52 * cf.s / 1.4, CENTER_BED.floor, .18);
+      s += '<g transform="' + cf.t + '">' + (bedId === 'bed_box' ? artBedBoxBack() : artThroneBack(u)) + '</g>';
+      if (centerIdx >= 0) {
+        var cp = pets[centerIdx], isLeadC = centerIdx === lead;
+        s += '<g class="pet' + (isLeadC ? ' lead' : '') + '" data-pet="' + centerIdx + '">';
+        if (bedId === 'bed_box') {
+          s += '<g clip-path="url(#' + u + 'bc)">' + petFigure(cp, cf.x(50), boxB, boxW, isLeadC, o, u) + '</g>';
+          s += nameTag(cp.name, cf.x(50), boxB - boxW - 3.5 - hatLift(o, isLeadC, boxW), tagFs(n));
+        } else {
+          var tW = cf.s * 50, tB = cf.ay(53);
+          s += petFigure(cp, CENTER_BED.cx, tB, tW, isLeadC, o, u);
+          s += nameTag(cp.name, CENTER_BED.cx, Math.min(tB - tW, cf.ay(10)) - 3.5 - hatLift(o, isLeadC, tW) * 0.6, tagFs(n));
+        }
+        s += '</g>';
+      }
+      s += '<g transform="' + cf.t + '">' + (bedId === 'bed_box' ? artBedBoxFront() : artThroneFront(u)) + '</g>';
+    } else {
+      s += floorShadow(SIDE_BED.cx, 42 * SIDE_BED.s, SIDE_BED.floor + 1);
+      s += '<g transform="' + floorT(SIDE_BED.cx, SIDE_BED.s, BED_BOT[bedId] || 80, SIDE_BED.floor) + '">' + art(bedId, u) + '</g>';
+    }
+    /* 바닥 스탠드 조명 (받침이 바닥에 닿게) */
+    if (o.light && LIGHT_FIT[o.light] && LIGHT_FIT[o.light].a === 'floor') {
+      var lf = LIGHT_FIT[o.light];
+      s += floorShadow(lf.x, lf.s * 20, lf.floor, .17);
+      s += place(o.light, lf, u);
+    }
     /* 소품 (오른쪽 바닥) */
-    if (o.deco && o.deco !== 'deco_none') s += place(o.deco, DECO_FIT, u);
-    /* 라면 박스 속 고양이 — 하반신은 앞판에 가린다 */
-    if (boxIdx >= 0) {
-      var bp = pets[boxIdx];
-      s += '<g class="pet lead" data-pet="' + boxIdx + '">';
-      s += '<g clip-path="url(#' + u + 'bc)">' + petFigure(bp, boxCx, boxB, boxW, boxIdx === lead, o, u) + '</g>';
-      s += nameTag(bp.name, boxCx, boxB - boxW - 3.5 - hatLift(o, boxIdx === lead, boxW), tagFs(n));
-      s += '</g>';
-      s += '<g transform="' + bedT() + '">' + artBedBoxFront() + '</g>';
+    if (o.deco && o.deco !== 'deco_none') {
+      s += floorShadow(DECO_FIT.cx, DECO_FIT.s * 26, DECO_FIT.floor, .18);
+      s += '<g transform="' + floorT(DECO_FIT.cx, DECO_FIT.s, DECO_BOT[o.deco] || 96, DECO_FIT.floor) + '">' + art(o.deco, u) + '</g>';
     }
-    /* 나머지 친구들 */
+    /* 나머지 친구들 — 가운데에 앉은 친구는 빼고 좌우·앞으로 */
     var rest = [];
-    for (i = 0; i < n; i++) if (i !== boxIdx) rest.push(i);
-    var slots = PET_SLOTS[rest.length] || [];
+    for (i = 0; i < n; i++) if (i !== centerIdx) rest.push(i);
+    var slots = (center ? REST_SLOTS : PET_SLOTS)[rest.length] || [];
     for (i = 0; i < rest.length; i++) s += petSvg(pets[rest[i]], slots[i], rest[i], rest.length, u, o, lead);
     return s;
   }
@@ -3377,7 +3504,7 @@ var Room = (function () {
 
   function curLook(extra) {
     var o = {
-      grade: RS.grade,
+      grade: gradePreview || RS.grade,
       pets: RS.pets.slice(0, 5),
       lead: leadIndex()
     }, i;
@@ -3425,10 +3552,10 @@ var Room = (function () {
     var st = el('stageArt');
     if (!st) return;
     st.innerHTML = sceneSvg(curLook());
-    st.className = 'stage-art' + (preview ? ' pv' : '');
-    var g = RG[RS.grade - 1];
+    st.className = 'stage-art' + ((preview || gradePreview) ? ' pv' : '');
+    var g = RG[(gradePreview || RS.grade) - 1];
     if (el('gradeChip')) el('gradeChip').textContent = g.n + '단계 · ' + g.name;
-    if (el('capChip')) el('capChip').textContent = '🐾 ' + RS.pets.length + '/' + capacity();
+    if (el('capChip')) el('capChip').textContent = '🐾 ' + RS.pets.length + '/' + capShown();
     var em = el('stageEmpty');
     if (em) em.hidden = RS.pets.length > 0;
     renderLock();
@@ -3438,20 +3565,38 @@ var Room = (function () {
   function renderLock() {
     var box = el('stageLock'), bar = el('lkBar');
     var it = preview ? itemById(preview.id) : null;
-    if (!it) { if (box) box.hidden = true; if (bar) bar.hidden = true; return; }
+    var gp = gradePreview ? RG[gradePreview - 1] : null;
+    if (!it && !gp) { if (box) box.hidden = true; if (bar) bar.hidden = true; return; }
     if (box) box.hidden = false;
     if (bar) bar.hidden = false;
+    var note = el('lkNote'), b = el('lkBuy');
+    if (gp) {
+      if (el('lkName')) el('lkName').textContent = gp.n + '단계 · ' + gp.name;
+      if (el('lkSlot')) el('lkSlot').textContent = '방 · 미리보기 · 잠김';
+      var isNext = gp.n === RS.maxGrade + 1, gShort = RS.coins < gp.price;
+      if (note) {
+        note.hidden = !(!isNext || gShort);
+        note.textContent = !isNext
+          ? ('방은 한 단계씩 이사할 수 있어요 · 지금 ' + RG[RS.maxGrade - 1].n + '단계 ' + RG[RS.maxGrade - 1].name + '까지 왔어요')
+          : ('코인 ' + fmt(Math.max(0, gp.price - RS.coins)) + '개 더 모으면 이사할 수 있어요');
+      }
+      if (b) {
+        b.disabled = !isNext;
+        b.className = 'lk-buy' + (!isNext ? ' off' : (gShort ? ' short' : ''));
+        b.textContent = !isNext ? ('지금은 ' + (RS.maxGrade + 1) + '단계부터')
+          : (gShort ? ('코인 ' + fmt(gp.price - RS.coins) + ' 부족') : ('이사하기 (' + fmt(gp.price) + ')'));
+      }
+      return;
+    }
     var lv = playerLevel(), req = it.req || 1, lvLock = lv < req, short = RS.coins < it.price;
     if (el('lkName')) el('lkName').textContent = it.name;
     if (el('lkSlot')) el('lkSlot').textContent = slotLabel(it.slot) + ' · 미리보기 · 잠김';
-    var note = el('lkNote');
     if (note) {
       note.hidden = !(lvLock || short);
       note.textContent = lvLock
         ? ('Lv.' + req + ' 달성 시 구매 가능 · 지금 Lv.' + lv)
         : ('코인 ' + fmt(it.price - RS.coins) + '개 더 모으면 살 수 있어요');
     }
-    var b = el('lkBuy');
     if (b) {
       b.disabled = lvLock;
       b.className = 'lk-buy' + (lvLock ? ' off' : (short ? ' short' : ''));
@@ -3466,17 +3611,29 @@ var Room = (function () {
   function setPreview(it) {
     if (!it) return;
     preview = { slot: it.slot, id: it.id };
+    gradePreview = 0;
     renderScene();
     renderBody(true);
     Sound.pick();
   }
-  function clearPreview() {
-    if (!preview) return;
+  function setGradePreview(n) {
+    var g = RG[n - 1];
+    if (!g) return;
+    gradePreview = n;
     preview = null;
+    renderScene();
+    Sound.pick();
+    toast(g.n + '단계 ' + g.name + ' 미리보기 · 아래 이사하기 버튼으로 결제');
+  }
+  function clearPreview() {
+    if (!preview && !gradePreview) return;
+    preview = null;
+    gradePreview = 0;
     renderScene();
     renderBody(true);
   }
   function buyPreview() {
+    if (gradePreview) { buyGrade(gradePreview); return; }
     if (!preview) return;
     var it = itemById(preview.id);
     if (!it) { clearPreview(); return; }
@@ -3538,7 +3695,7 @@ var Room = (function () {
   }
 
   function petRoster() {
-    var i, s = '', n = RS.pets.length, cap = capacity(), lead = leadIndex();
+    var i, s = '', n = RS.pets.length, cap = capShown(), lead = leadIndex();
     s += '<p class="room-hint">' + RS.grade + '단계 방 · 함께 살 수 있는 친구 <b>' + cap + '마리</b> (지금 ' + n + '마리). ' +
          '이름을 눌러 직접 바꿀 수 있어요.</p>';
     if (!n) {
@@ -3559,7 +3716,7 @@ var Room = (function () {
     }
     s += '</div>';
     if (n < cap) s += '<p class="room-hint"><b>입양</b> 탭에서 새 품종을 맞이할 수 있어요.</p>';
-    else if (RS.grade < GRADE_MAX) s += '<p class="room-hint">지금 방은 가득 찼어요. <b>방</b> 탭에서 이사하면 ' + RG[RS.grade].cap + '마리까지 늘어나요.</p>';
+    else if (RS.maxGrade < GRADE_MAX) s += '<p class="room-hint">지금 방은 가득 찼어요. <b>방</b> 탭에서 이사하면 ' + RG[RS.maxGrade].cap + '마리까지 늘어나요.</p>';
     else s += '<p class="room-hint">궁궐에는 다섯 친구까지 함께 살 수 있어요.</p>';
     return s;
   }
@@ -3574,7 +3731,7 @@ var Room = (function () {
     } else if (curTab === 'adopt') {
       var cats = BREEDS.filter(function (b) { return b.kind === 'cat'; });
       var dogs = BREEDS.filter(function (b) { return b.kind === 'dog'; });
-      if (petsAtCap() && RS.grade < GRADE_MAX) {
+      if (petsAtCap() && RS.maxGrade < GRADE_MAX) {
         s += '<p class="room-hint">지금 방은 <b>' + capacity() + '마리</b>까지예요. <b>방</b> 탭에서 이사하면 더 입양할 수 있어요.</p>';
       } else if (!RS.pets.length) {
         s += '<p class="room-hint">첫 친구는 <b>무료</b>예요. 고양이·강아지 중 마음에 드는 품종을 골라 주세요.</p>';
@@ -3584,15 +3741,17 @@ var Room = (function () {
       s += '<div class="sec-h">🐱 고양이 <span>8품종</span></div><div class="grid breeds">' + cats.map(breedCard).join('') + '</div>';
       s += '<div class="sec-h">🐶 강아지 <span>8품종</span></div><div class="grid breeds">' + dogs.map(breedCard).join('') + '</div>';
     } else if (curTab === 'room') {
-      s += '<p class="room-hint">판을 깰 때마다 코인을 모아 방을 넓혀요. 방이 넓을수록 함께 살 수 있는 친구도 늘어요.</p>';
+      s += '<p class="room-hint">살았던 방은 언제든 눌러서 <b>무료로 돌아갈</b> 수 있어요. 아직 못 가 본 방은 눌러서 미리 보기 → <b>이사하기</b> 버튼으로 결제해요.</p>';
       RG.forEach(function (g) {
-        var has = RS.grade >= g.n, next = g.n === RS.grade + 1;
-        var priceTxt = g.n === 1 ? '기본 방' : (has ? '이미 이사함' : COIN + ' ' + fmt(g.price));
-        var cls = 'roomup' + (has ? ' on' : '') + (!has && !next ? ' locked' : '');
+        var cur = RS.grade === g.n, unlocked = RS.maxGrade >= g.n, next = g.n === RS.maxGrade + 1;
+        var priceTxt = cur ? '현재 방'
+          : (unlocked ? '보유 · 눌러서 이동'
+          : (g.n === 1 ? '기본 방' : COIN + ' ' + fmt(g.price)));
+        var cls = 'roomup' + (cur ? ' on' : '') + (unlocked && !cur ? ' have' : '') + (!unlocked && !next ? ' locked' : '');
         s += '<div class="' + cls + '" data-grade="' + g.n + '">' +
           '<div class="pv">' + sceneSvg({ grade: g.n, pets: RS.pets.slice(0, g.cap), lead: leadIndex(), hat: 'hat_none', outfit: 'outfit_rag', bed: 'bed_box', wall: 'wall_old', frame: 'frame_empty', rug: 'rug_none', light: 'light_bulb', deco: 'deco_none' }) + '</div>' +
           '<div class="info"><b>' + g.n + '단계 · ' + g.name + '</b><small>' + g.sub + ' · 친구 ' + g.cap + '마리</small>' +
-          '<span class="pr' + (has ? ' ok' : (next ? '' : ' no')) + '">' + priceTxt + '</span></div>' +
+          '<span class="pr' + (cur ? ' ok' : (unlocked ? ' ok' : (next ? '' : ' no'))) + '">' + priceTxt + '</span></div>' +
         '</div>';
       });
     } else if (curTab === 'deco') {
@@ -3644,12 +3803,38 @@ var Room = (function () {
     if (levelLocked(it)) toast('Lv.' + (it.req || 1) + ' 달성 시 살 수 있어요 · 지금은 미리보기');
   }
 
+  /* 방 카드 탭 — 해금한 방은 무료로 전환, 못 가 본 방은 스테이지 미리보기 + 잠금 배너 */
+  function tapGrade(n) {
+    var g = RG[n - 1];
+    if (!g) return;
+    if (RS.grade === n) { toast('지금 ' + g.n + '단계 ' + g.name + '에 살고 있어요'); Sound.pick(); return; }
+    if (RS.maxGrade >= n) { moveIn(n); return; }
+    setGradePreview(n);
+  }
+
+  /* 해금한 방으로 이동 (비용 없음) — 친구 상한은 maxGrade 기준이라 그대로 */
+  function moveIn(n) {
+    var g = RG[n - 1];
+    if (!g) return;
+    gradePreview = 0;
+    preview = null;
+    RS.grade = n;
+    save();
+    renderAll();
+    Sound.pick();
+    toast(g.n + '단계 ' + g.name + (n === RS.maxGrade ? ' · 지금 해금한 가장 넓은 방이에요' : '으로 방 옮기기 완료'));
+  }
+
+  /* 방 이사 결제 — 잠금 배너의 '이사하기' 버튼으로만 들어온다 */
   function buyGrade(n) {
     var g = RG[n - 1];
     if (!g) return;
-    if (RS.grade >= n) { toast('이미 ' + g.n + '단계 ' + g.name + '에 살고 있어요'); return; }
-    if (n !== RS.grade + 1) { toast('방은 한 단계씩 올릴 수 있어요'); return; }
-    if (!confirmArm('grade:' + n, '한 번 더 누르면 ' + fmt(g.price) + '코인으로 ' + g.name + '으로 이사')) return;
+    if (RS.grade === n) { toast('이미 ' + g.n + '단계 ' + g.name + '에 살고 있어요'); return; }
+    if (n !== RS.maxGrade + 1) {
+      toast(n <= RS.maxGrade ? '이미 해금한 방이에요 · 눌러서 바로 이동할 수 있어요' : '방은 한 단계씩 이사할 수 있어요');
+      Sound.fail();
+      return;
+    }
     if (RS.coins < g.price) {
       toast('코인이 ' + fmt(g.price - RS.coins) + '개 부족해요 · 판을 깨서 모아 보세요');
       Sound.fail();
@@ -3657,6 +3842,8 @@ var Room = (function () {
     }
     RS.coins -= g.price;
     RS.grade = n;
+    RS.maxGrade = Math.max(RS.maxGrade, n);
+    gradePreview = null;
     save();
     renderAll();
     Sound.win();
@@ -3668,7 +3855,7 @@ var Room = (function () {
     if (!b) return 0;
     if (hasBreed(b.id)) { toast(b.name + '는 이미 함께 살고 있어요'); Sound.pick(); return 0; }
     if (petsAtCap()) {
-      if (RS.grade < GRADE_MAX) toast('지금 방은 ' + capacity() + '마리까지예요 · 방을 넓히면 ' + RG[RS.grade].cap + '마리까지');
+      if (RS.maxGrade < GRADE_MAX) toast('지금 방은 ' + capacity() + '마리까지예요 · 방을 넓히면 ' + RG[RS.maxGrade].cap + '마리까지');
       else toast('궁궐은 다섯 친구까지 함께 살 수 있어요');
       Sound.fail();
       return 0;
@@ -3808,7 +3995,7 @@ var Room = (function () {
       var ld = t.closest ? t.closest('[data-lead]') : null;
       if (ld) { setLead(parseInt(ld.dataset.lead, 10)); return; }
       var gr = t.closest ? t.closest('[data-grade]') : null;
-      if (gr) { buyGrade(parseInt(gr.dataset.grade, 10)); return; }
+      if (gr) { tapGrade(parseInt(gr.dataset.grade, 10)); return; }
       if (t.id === 'btnAdoptFirst' || (t.closest && t.closest('#btnAdoptFirst'))) {
         curTab = 'adopt'; renderTabs(); renderBody(); Sound.pick();
       }
@@ -3871,18 +4058,25 @@ var Room = (function () {
       /* 로드 직후 바로 띄우고, 방을 열 때 한 번 더 (게임 화면에서는 방 오버레이가 닫혀 있어 안 보일 수 있음) */
       setTimeout(function () { toast('방 꾸미기 초기화 · 600코인 환불 완료!'); }, 700);
     }
+    if (refundGradePending) {
+      var rg = refundGradePending;
+      refundGradePending = 0;
+      setTimeout(function () { toast('방 이사 취소 · +' + fmt(rg) + '코인 환불 완료!'); }, 900);
+    }
   }
 
   return { init: init, open: open, close: close, isOpen: isOpen, award: award, render: renderAll,
            adopt: adopt, rename: renamePet, setLead: setLead,
            state: function () {
-             return { coins: RS.coins, grade: RS.grade, gradeName: RG[RS.grade - 1].name, cap: capacity(),
-                      level: playerLevel(), pets: RS.pets.slice(), lead: leadIndex(),
-                      owned: RS.owned, equipped: RS.equipped, preview: preview };
+             return { coins: RS.coins, grade: RS.grade, maxGrade: RS.maxGrade, gradeName: RG[RS.grade - 1].name,
+                      cap: capacity(), level: playerLevel(), pets: RS.pets.slice(), lead: leadIndex(),
+                      owned: RS.owned, equipped: RS.equipped, preview: preview, gradePreview: gradePreview };
            },
            _rs: RS, _rg: RG, _items: ITEMS, _breeds: BREEDS, _slots: SLOTS,
            _bonus: clearBonus,
            _preview: function (id) { var it = itemById(id); if (it) setPreview(it); return preview; },
+           _tapGrade: tapGrade, _moveIn: moveIn,
+           _clearPv: function () { clearPreview(); },
            _buy: function () { buyPreview(); return RS.coins; } };
 })();
 
@@ -3928,6 +4122,8 @@ if (window.__wsp) {
       rs.lead = o.lead || 0;
       for (i = 0; i < Room._items.length; i++) rs.owned[Room._items[i].id] = 1;
       rs.grade = o.grade || 20;
+      rs.maxGrade = o.maxGrade || Math.max(rs.grade, o.grade || 1);
+      Room._clearPv();
       rs.equipped.hat = o.hat || 'hat_crown';
       rs.equipped.outfit = o.outfit || 'outfit_cape';
       rs.equipped.bed = o.bed || 'bed_canopy';
@@ -3941,16 +4137,19 @@ if (window.__wsp) {
       store('wsp.room.lead', String(rs.lead));
       store('wsp.room.owned', JSON.stringify(rs.owned));
       store('wsp.room.grade', String(rs.grade));
+      store('wsp.room.mg', String(rs.maxGrade));
       store('wsp.room.equipped', JSON.stringify(rs.equipped));
       store('wsp.coins', String(rs.coins));
       Room.render();
       return Room.state();
     },
     preview: function (id) { return Room._preview(id); },
+    tapGrade: function (n) { Room._tapGrade(n); return Room.state(); },
+    moveIn: function (n) { Room._moveIn(n); return Room.state(); },
     buy: function () { return Room._buy(); },
     bonus: function (moves, par) { return Room._bonus(moves, par); },
     reset: function () {
-      var keys = ['wsp.coins', 'wsp.room.grade', 'wsp.room.char', 'wsp.room.owned', 'wsp.room.equipped',
+      var keys = ['wsp.coins', 'wsp.room.grade', 'wsp.room.mg', 'wsp.room.rf_grade_back', 'wsp.room.char', 'wsp.room.owned', 'wsp.room.equipped',
                   'wsp.room.welcome', 'wsp.room.pets', 'wsp.room.lead', 'wsp.room.rgv', 'wsp.room.rf1',
                   'wsp.room.rf600'];
       keys.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
