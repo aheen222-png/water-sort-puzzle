@@ -3557,7 +3557,7 @@ var Room = (function () {
     if (el('gradeChip')) el('gradeChip').textContent = g.n + '단계 · ' + g.name;
     if (el('capChip')) el('capChip').textContent = '🐾 ' + RS.pets.length + '/' + capShown();
     var em = el('stageEmpty');
-    if (em) em.hidden = RS.pets.length > 0;
+    if (em) em.hidden = (RS.pets.length > 0) || !!gradePreview;
     renderLock();
   }
 
