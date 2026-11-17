@@ -4781,12 +4781,40 @@ var Room = (function () {
     if (levelLocked(it)) toast('Lv.' + (it.req || 1) + ' 달성 시 살 수 있어요 · 지금은 미리보기');
   }
 
-  /* 방 카드 탭 — 해금한 방은 무료로 전환, 못 가 본 방은 스테이지 미리보기 + 잠금 배너 */
+  /* 방 카드 탭 — 해금한 방은 무료로 전환, 못 가 본 방은 스테이지 미리보기 + 잠금 배너
+     보유한 방(지금 사는 방 포함)을 누르면 다른 방의 미리보기는 반드시 걷어낸다 */
   function tapGrade(n) {
     var g = RG[n - 1];
     if (!g) return;
-    if (RS.grade === n) { toast('지금 ' + g.n + '단계 ' + g.name + '에 살고 있어요'); Sound.pick(); return; }
-    if (RS.maxGrade >= n) { moveIn(n); return; }
+    var hadGradePv = !!gradePreview;
+    if (RS.maxGrade >= n) {
+      /* 보유한 방은 방 미리보기를 무조건 해제하고 실제 방 화면으로 되돌린다 */
+      gradePreview = 0;
+      if (pvFocus && pvFocus.kind === 'grade') pvFocus = null;
+      if (RS.grade === n) {
+        refocus();
+        renderScene();
+        renderBody(true);
+        Sound.pick();
+        toast(hadGradePv
+          ? ('방 미리보기 닫았어요 · 지금 ' + g.n + '단계 ' + g.name + '에 살고 있어요')
+          : ('지금 ' + g.n + '단계 ' + g.name + '에 살고 있어요'));
+        return;
+      }
+      moveIn(n);
+      return;
+    }
+    /* 아직 못 가 본 방 — 미리보기. 같은 방 카드를 다시 누르면 미리보기를 닫는다 */
+    if (gradePreview === n) {
+      gradePreview = 0;
+      if (pvFocus && pvFocus.kind === 'grade') pvFocus = null;
+      refocus();
+      renderScene();
+      renderBody(true);
+      Sound.pick();
+      toast('방 미리보기 닫았어요 · 지금 ' + RG[RS.grade - 1].n + '단계 ' + RG[RS.grade - 1].name + '에 살고 있어요');
+      return;
+    }
     setGradePreview(n);
   }
 
