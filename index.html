@@ -1016,6 +1016,7 @@ function fitStage(force) {
   var curTiers = colLeft.querySelectorAll('.shelf').length || 2;
   if (force || plan.tiers !== curTiers) {
     game.tiers = plan.tiers;
+    clearSelected();                 // 요소를 새로 그리므로 선택 표시도 초기화
     buildLayout();
     renderAll(false);
     updateHud();
