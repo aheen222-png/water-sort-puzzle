@@ -73,7 +73,7 @@ body{
   padding:4px clamp(2px, 1.4vw, 12px);
 }
 .col{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
-      gap:clamp(8px, 2.1vh, 22px); width:100%; }
+      gap:var(--rowgap, clamp(8px, 2.1vh, 22px)); width:100%; }
 .col.center{ width:auto; }
 
 /* 선반 */
@@ -364,8 +364,9 @@ body{
    1. 게임 규칙 (DOM 비의존 순수 로직)
    ===================================================================== */
 /* @@CORE-START */
-var COLORS = ['#6FDC4A', '#FF5C8A', '#FFD22E', '#3EC5F7', '#9C6BFF', '#FF8A2B', '#16D3BE', '#E75BD8'];
-var COLOR_NAMES = ['연두', '코랄', '노랑', '하늘', '보라', '주황', '청록', '자홍'];
+/* 색 구분이 또렷하도록 샘플과 같은 6색만 쓴다 (청록·자홍 제외) */
+var COLORS = ['#6FDC4A', '#FF5C8A', '#FFD22E', '#3EC5F7', '#9C6BFF', '#FF8A2B'];
+var COLOR_NAMES = ['연두', '코랄', '노랑', '하늘', '보라', '주황'];
 
 /* 시드 기반 난수 (같은 레벨 = 같은 판) */
 function mulberry32(seed) {
@@ -379,34 +380,89 @@ function mulberry32(seed) {
   };
 }
 
-/* 레벨 설계
-   · 1~2레벨: 일반 병만
-   · 3레벨부터: 가운데 '목표 병'(용량 8칸)이 등장.
-     목표 병은 시작할 때 언제나 0칸이고, 어떤 색을 채워야 하는지만 뱃지·링으로 알려준다.
-     목표 색 8칸은 일반 병들에 섞여 있고, 일반 병 수는
-     '일반 색 수 + 목표 색 몫 2병 + 여유 빈 병 2병'으로 넉넉히 잡는다. */
+/* 레벨 설계 (색은 샘플과 같은 6색 고정 — 병 개수와 선반 단 수로만 난이도를 올린다)
+   · 1~2레벨: 일반 병만 (긴 병 없음)
+   · 3레벨 부터: 가운데 '목표 병'이 등장. 시작은 언제나 0칸이고,
+     목표 색 8·12·16칸이 일반 병들에 나뉘어 있다. 두 병씩 부어 긴 병을 채우면 완성이다.
+   · 레벨이 오르면 같은 색을 여러 일반 병(3~4병 = 12~16칸)에 나눠 담아 병 수를 늘린다.
+       1~2  : 일반 6~7병 (1단)
+       3~4  : 일반 8~9병 + 가운데 8칸 (2단 선반)
+       5~6  : 일반 14병 + 가운데 8칸  (3단 선반)
+       7~9  : 일반 16병 + 가운데 12칸
+       10~12: 일반 20병 + 가운데 12칸 (4단 선반)
+       13~15: 일반 21병 + 가운데 12칸
+       16~19: 일반 22병 + 가운데 12칸
+       20+  : 일반 23병 + 가운데 16칸 (샘플과 같은 최대 배치)
+     색 하나가 3~4병이어도 일반 병 하나가 그 색 4칸으로 차면 뚜껑이 닫혀 완성되고,
+     나머지 칸은 다른 일반 병에서 채워 완성된다. (목표 색만 가운데 긴 병 전용) */
 function levelConfig(level) {
   var tall = level >= 3;
-  var normalColors = tall ? Math.min(6, level + 1) : Math.min(5, level + 3);   // 일반 색 수
-  var colors = normalColors + (tall ? 1 : 0);                                  // 목표 색 포함
-  var depth = Math.min(96, 18 + (level - 1) * 8);                              // 뒤섞는 횟수
-  return { colors: colors, normalColors: normalColors, tall: tall, empties: 2, depth: depth, level: level };
+  var counts, tallCap, tiers;
+  if (!tall) {                                   // 1~2레벨: 일반 병만
+    counts = level <= 1 ? [1, 1, 1, 1] : [1, 1, 1, 1, 1];
+    tallCap = 0; tiers = 1;
+  } else if (level <= 4) {                       // 3~4레벨: 좌우 2단
+    counts = level <= 3 ? [1, 1, 1, 1] : [1, 1, 1, 1, 1];
+    tallCap = 8; tiers = 2;
+  } else if (level <= 6) {                       // 5~6레벨: 좌우 3단
+    counts = [2, 2, 2, 2, 2]; tallCap = 8; tiers = 3;
+  } else if (level <= 9) {
+    counts = [3, 2, 2, 2, 2]; tallCap = 12; tiers = 3;
+  } else if (level <= 12) {                      // 10~: 좌우 4단 (샘플 배치)
+    counts = [3, 3, 3, 3, 3]; tallCap = 12; tiers = 4;
+  } else if (level <= 15) {
+    counts = [4, 3, 3, 3, 3]; tallCap = 12; tiers = 4;
+  } else if (level <= 19) {
+    counts = [4, 4, 3, 3, 3]; tallCap = 12; tiers = 4;
+  } else {                                       // 20레벨 이상: 최대 배치
+    counts = [4, 4, 3, 3, 3]; tallCap = 16; tiers = 4;
+  }
+  var normalColors = counts.length;
+  var colors = normalColors + (tall ? 1 : 0);                 // 목표 색 포함
+  var filled = 0, i;
+  for (i = 0; i < counts.length; i++) filled += counts[i];
+  if (tall) filled += tallCap / 4;                             // 목표 색 몫 병 수
+  var normalBottles = filled + 2;                              // + 여유 빈 병 2
+  var depth = Math.min(220, 26 + normalBottles * 9);           // 뒤섞는 횟수
+  return {
+    colors: colors, normalColors: normalColors, tall: tall, tallCap: tallCap,
+    counts: counts, empties: 2, tiers: tiers, normalBottles: normalBottles,
+    units: filled - (tall ? tallCap / 4 : 0) + (tall ? 1 : 0), // 진행도 분모(완성 병 수)
+    depth: depth, level: level
+  };
 }
 
-/* 완성 상태에서 출발하는 병들 (역연산 섞기의 출발점)
-   - 긴 병이 있는 레벨: 목표 색 하나가 '긴 병 전담'(8칸). 그 색의 일반 병은 만들지 않는다.
-     목표 색 8칸이 들어갈 병 2개 + 여유 빈 병 2개를 더 두어 일반 병 수를 넉넉히 잡는다
-     (예: 일반 색 4종 + 목표 색 → 일반 병 8개 = 채워진 6개 + 빈 2개, 가운데 빈 긴 병 1개). */
-function makeBottles(cfg, goal) {
-  var out = [], c, e;
-  var hasGoal = (goal !== null && goal !== undefined);
-  var goalSlots = cfg.tall ? 2 : 0;              // 목표 색 8칸이 차지할 병 수
-  for (c = 0; c < cfg.colors; c++) {
-    if (hasGoal && c === goal) continue;          // 목표 색은 긴 병이 전담
-    out.push({ cells: new Array(4).fill(c), cap: 4, tall: false, goal: null, levelGoal: hasGoal ? goal : null });
+/* 색별 병 수(counts)를 시드에 맞춰 색에 배분 (매 판 다른 조합) */
+function pickCopies(cfg, goal, rng) {
+  var copies = {}, list = [], i, t, tmp;
+  for (i = 0; i < cfg.colors; i++) if (i !== goal) list.push(i);
+  for (i = list.length - 1; i > 0; i--) {              // 시드 셔플
+    t = Math.floor(rng() * (i + 1));
+    tmp = list[i]; list[i] = list[t]; list[t] = tmp;
   }
-  for (e = 0; e < cfg.empties + goalSlots; e++) out.push({ cells: [], cap: 4, tall: false, goal: null, levelGoal: hasGoal ? goal : null });
-  if (cfg.tall) out.push({ cells: new Array(8).fill(goal), cap: 8, tall: true, goal: goal, levelGoal: goal });
+  for (i = 0; i < list.length; i++) copies[list[i]] = cfg.counts[i] || 1;
+  return copies;
+}
+
+/* 완성된 판에서 출발하는 병들 (역연산 섞기의 출발점)
+   - 일반 색: 4칸짜리 완성 병을 counts 대로 (3~4병 = 12~16칸)
+   - 목표 색: 가운데 긴 병 용량(8·12·16칸)을 가득 채운 완성 상태에서 출발하고,
+     긴 병 몫 병(tallCap/4)은 빈 병으로 둔다. (섞을 때 목표 색이 그 빈 병들로 퍼진다)
+   - 여유 빈 병 2개. */
+function makeBottles(cfg, goal, copies) {
+  var out = [], c, e, i, k;
+  var hasGoal = (goal !== null && goal !== undefined);
+  for (c = 0; c < cfg.colors; c++) {
+    if (hasGoal && c === goal) continue;              // 목표 색은 긴 병이 전담
+    k = (copies && copies[c]) ? copies[c] : 1;
+    for (i = 0; i < k; i++)
+      out.push({ cells: new Array(4).fill(c), cap: 4, tall: false, goal: null, levelGoal: hasGoal ? goal : null });
+  }
+  var emptySlots = cfg.empties + (cfg.tall ? cfg.tallCap / 4 : 0);
+  for (e = 0; e < emptySlots; e++)
+    out.push({ cells: [], cap: 4, tall: false, goal: null, levelGoal: hasGoal ? goal : null });
+  if (cfg.tall)
+    out.push({ cells: new Array(cfg.tallCap).fill(goal), cap: cfg.tallCap, tall: true, goal: goal, levelGoal: goal });
   return out;
 }
 
@@ -443,7 +499,7 @@ function applyPour(state, ai, bi) {
 /* 완성 판정
    · 일반 병: 네 칸이 모두 같은 색. 단 목표 색은 가운데 긴 병에서만 완성되므로,
      일반 병에 가득 찬 목표 색은 '완성'이 아니다 — 뚜껑이 닫히지 않고 긴 병으로 부을 수 있다.
-   · 가운데 긴 병: 목표 색 8칸일 때만 완성. */
+   · 가운데 긴 병: 목표 색으로 용량(8·12·16칸)을 가득 냈을 때만 완성. */
 function isComplete(bottle) {
   var cells = bottle.cells, i;
   if (cells.length !== bottle.cap) return false;
@@ -463,7 +519,7 @@ function isWin(state) {
   return true;
 }
 
-/* 목표를 이룬 색 수 — 일반 색은 4칸 완성, 목표 색은 긴 병 8칸으로만 인정 */
+/* 목표를 이룬 색 수 — 일반 색은 4칸 완성, 목표 색은 가운데 긴 병을 가득 채워야 인정 */
 function goalColorOf(state) {
   for (var i = 0; i < state.length; i++) if (state[i].tall) return state[i].goal;
   return null;
@@ -601,20 +657,42 @@ function scramble(state, depth, rng) {
   return moves;
 }
 
+/* 여러 색이 섞여 있는 병 수 (섞임 정도) */
+function countMixed(state) {
+  var n = 0, i, j, cells;
+  for (i = 0; i < state.length; i++) {
+    cells = state[i].cells;
+    if (state[i].tall || cells.length < 2) continue;
+    for (j = 1; j < cells.length; j++) if (cells[j] !== cells[0]) { n++; break; }
+  }
+  return n;
+}
+
 /* 레벨 생성 (항상 풀 수 있는 판) */
 function generateLevel(level, seed) {
   var cfg = levelConfig(level);
   var best = null, bestScore = -Infinity, round, attempt;
 
   for (round = 0; round < 3; round++) {
-    for (attempt = 0; attempt < 60; attempt++) {
+    for (attempt = 0; attempt < 48; attempt++) {
       var rng = mulberry32((seed + round * 7919 + Math.imul(attempt, 2654435761)) >>> 0);
       var goal = cfg.tall ? Math.floor(rng() * cfg.colors) : null;   // 가운데 긴 병의 목표 색
-      var state = makeBottles(cfg, goal);
-      var moves = scramble(state, cfg.depth, rng);
-      if (!moves) continue;                                          // 긴 병을 다 비우지 못한 시도는 버린다
+      var copies = pickCopies(cfg, goal, rng);
+      var state = makeBottles(cfg, goal, copies);
 
-      var tallLen = -1, empties = 0, i;
+      /* 좌우 선반에 놓일 순서를 먼저 섞어 같은 색 병이 붙어 보이지 않게 (섞기 전에 해야 수 기록이 맞는다) */
+      var normals = [], i;
+      for (i = 0; i < state.length; i++) if (!state[i].tall) normals.push(state[i]);
+      for (i = normals.length - 1; i > 0; i--) {
+        var j = Math.floor(rng() * (i + 1));
+        var tmp = normals[i]; normals[i] = normals[j]; normals[j] = tmp;
+      }
+      for (i = 0; i < normals.length; i++) state[i] = normals[i];
+
+      var moves = scramble(state, cfg.depth, rng);
+      if (!moves) continue;
+
+      var tallLen = -1, empties = 0;
       for (i = 0; i < state.length; i++) {
         if (state[i].tall) tallLen = state[i].cells.length;
         else if (!state[i].cells.length) empties++;
@@ -623,10 +701,13 @@ function generateLevel(level, seed) {
       if (isWin(state)) continue;                                    // 이미 완성된 판은 버린다
 
       var split = splitColors(state);
+      var mixed = countMixed(state);
       var done = countSettled(state);
-      var score = split * 100 + moves.length - done * 10 + empties * 3;   // 빈 병이 하나라도 있는 판을 살짝 선호
-      var result = { bottles: state, cfg: cfg, goal: goal, moves: moves, attempt: attempt, split: split, score: score };
-      if (split >= cfg.colors) return result;
+      var score = split * 90 + mixed * 14 + moves.length * 0.8 - done * 30 + empties * 10;
+      var result = { bottles: state, cfg: cfg, goal: goal, moves: moves, attempt: attempt,
+                     split: split, mixed: mixed, done: done, score: score };
+      /* 목표: 모든 색이 여러 병에 흩어지고, 처음부터 완성된 병이 없고, 대부분 병이 섞인 상태 */
+      if (split >= cfg.colors && done === 0 && mixed >= cfg.normalBottles - 3) return result;
       if (score > bestScore) { bestScore = score; best = result; }
     }
     if (best) break;
@@ -635,10 +716,11 @@ function generateLevel(level, seed) {
 }
 
 /* 무대에 올릴 순서: 일반 병은 좌/우 선반, 긴 병은 가운데 */
-function splitRows(count) {
-  var rows = Math.ceil(count / 3), out = [], rem = count, i;
-  for (i = 0; i < rows; i++) {
-    var take = Math.ceil(rem / (rows - i));
+function splitRows(count, rows) {
+  var r = Math.max(1, Math.min(rows || Math.ceil(count / 3), count));
+  var out = [], rem = count, i;
+  for (i = 0; i < r; i++) {
+    var take = Math.ceil(rem / (r - i));
     out.push(take); rem -= take;
   }
   return out;
@@ -826,7 +908,7 @@ function renderAll(animate) {
   });
 }
 
-/* 선반 배치 */
+/* 선반 배치: 좌우 선반에 일반 병을 단(tier)별로 나눠 놓고, 가운데에 긴 병 */
 function buildLayout() {
   colLeft.innerHTML = ''; colCenter.innerHTML = ''; colRight.innerHTML = '';
 
@@ -836,9 +918,10 @@ function buildLayout() {
   var nL = Math.ceil(normals.length / 2);
   var groups = [normals.slice(0, nL), normals.slice(nL)];
   var cols = [colLeft, colRight];
+  var tiers = game.tiers || (game.cfg ? game.cfg.tiers : 3);
 
   groups.forEach(function (list, gi) {
-    var rows = splitRows(list.length), k = 0;
+    var rows = splitRows(list.length, tiers), k = 0;
     rows.forEach(function (cnt) {
       var shelf = document.createElement('div'); shelf.className = 'shelf';
       var rack = document.createElement('div'); rack.className = 'rack';
@@ -857,7 +940,7 @@ function buildLayout() {
     var badge = document.createElement('div');
     badge.className = 'goal-badge';
     badge.innerHTML = '<i></i>목표 <b>' + COLOR_NAMES[tall.goal] + '</b>' +
-                      '<span class="goal-count" id="goalCount">0/8</span>';
+                      '<span class="goal-count" id="goalCount">0/' + tall.cap + '</span>';
     badge.querySelector('i').style.setProperty('--c', COLORS[tall.goal]);
     game.goalCountEl = badge.querySelector('#goalCount');
 
@@ -875,9 +958,9 @@ function updateHud() {
   elLv.textContent = String(game.level);
   elMove.textContent = String(game.moves);
   elDone.textContent = String(countSettled(game.bottles));
-  elTotal.textContent = String(game.cfg ? game.cfg.colors : 0);
+  elTotal.textContent = String(game.cfg ? game.cfg.units : 0);
   $('#btnUndo').style.opacity = game.history.length ? '1' : '.45';
-  /* 가운데 목표 병 진행도 (0/8 → 8/8) */
+  /* 가운데 목표 병 진행도 (0/8 · 0/12 · 0/16) */
   if (game.goalCountEl) {
     var tall = null;
     game.bottles.forEach(function (b) { if (b.tall) tall = b; });
@@ -885,38 +968,73 @@ function updateHud() {
   }
 }
 
-/* 화면에 맞춰 병 크기 자동 조절 (아이폰 세로 ~ 데스크톱) */
-function fitStage() {
+/* 화면에 맞춰 병 크기·선반 단 수 자동 조절 (아이폰 세로 ~ 데스크톱) */
+var GX = 0.10;          // 병 사이·양끝 여백 (병 폭 대비)
+var BOTTLE_H = 3.62;    // 병 한 개 + 선반 두께 (병 폭 대비)
+var TALL_SPAN = 1.09;   // 가운데 긴 병이 차지하는 폭 + 간격
+var MIN_BW = 26;
+
+function planTiers(nL, W, H, tall, badgeH) {
+  var rowGap = Math.max(8, Math.min(22, H * 0.021));
+  var roomH = H - (tall ? badgeH + 8 : 10);
+  function bwFor(R) {
+    var cols = Math.ceil(nL / R);
+    var perSide = cols + (cols + 1) * GX;
+    var bwW = (W - (tall ? 18 : 10)) / (2 * perSide + (tall ? TALL_SPAN : 0));
+    var bwH = (roomH - (R - 1) * rowGap) / (R * BOTTLE_H);
+    return Math.min(bwW, bwH, 78);
+  }
+  var pref = game.cfg ? game.cfg.tiers : 3;
+  var prefBw = bwFor(pref);
+  if (prefBw >= MIN_BW + 1) return { tiers: pref, bw: prefBw, rowGap: rowGap };
+  /* 아주 납작한 화면(가로 모드 등)에서는 단 수를 늘리거나 줄여 크기를 지킨다 */
+  var best = { tiers: pref, bw: prefBw };
+  for (var R = 1; R <= nL; R++) {
+    var b = bwFor(R);
+    if (b > best.bw + 0.5) best = { tiers: R, bw: b };
+  }
+  best.rowGap = rowGap;
+  return best;
+}
+
+function fitStage(force) {
   var W = stageEl.clientWidth, H = stageEl.clientHeight;
   if (!W || !H) return;
 
-  var maxCols = 1, maxRows = 1;
-  [colLeft, colRight].forEach(function (col) {
-    var racks = col.querySelectorAll('.rack');
-    if (racks.length > maxRows) maxRows = racks.length;
-    Array.prototype.forEach.call(racks, function (r) {
-      if (r.children.length > maxCols) maxCols = r.children.length;
-    });
-  });
-
   var tall = !!(game.cfg && game.cfg.tall);
-  var gx = 0.10;                                  // 병 간격/양끝 여백 (병 폭 대비)
-  var perSide = maxCols + (maxCols + 1) * gx;
-  var tallSpan = tall ? 0.95 + 0.14 : 0;
-  var bwW = (W - (tall ? 18 : 10)) / (2 * perSide + tallSpan);
-  var bwH = (H - (maxRows - 1) * 20 - 10) / (maxRows * 3.62);
+  var normals = 0;
+  game.bottles.forEach(function (b) { if (!b.tall) normals++; });
+  if (!normals) return;
+  var nL = Math.ceil(normals / 2);
   var badgeEl = stageEl.querySelector('.goal-badge');
-  var badgeH = badgeEl ? badgeEl.offsetHeight + 8 : 0;
-  var bwT = tall ? (H - 10 - badgeH) / 5.6 : Infinity;
+  var badgeH = badgeEl ? badgeEl.offsetHeight + 8 : (tall ? 24 : 0);
 
-  var bw = Math.max(26, Math.min(bwW, bwH, bwT, 78));
+  var plan = planTiers(nL, W, H, tall, badgeH);
+  stageEl.style.setProperty('--rowgap', plan.rowGap.toFixed(1) + 'px');
+
+  /* 계획한 단 수가 지금 선반과 다르면 다시 그린다 */
+  var curTiers = colLeft.querySelectorAll('.shelf').length || 2;
+  if (force || plan.tiers !== curTiers) {
+    game.tiers = plan.tiers;
+    buildLayout();
+    renderAll(false);
+    updateHud();
+    badgeEl = stageEl.querySelector('.goal-badge');
+    badgeH = badgeEl ? badgeEl.offsetHeight + 8 : (tall ? 24 : 0);
+    plan = planTiers(nL, W, H, tall, badgeH);
+  }
+
+  var bw = Math.max(MIN_BW, Math.min(plan.bw, 78));
   stageEl.style.setProperty('--bw', bw.toFixed(2) + 'px');
 
-  /* 가운데 긴 병은 좌우 선반 높이에 맞춰 길게 */
+  /* 가운데 긴 병은 좌우 선반 전체 높이에 맞춰 길게 */
   if (tall) {
     var sideH = Math.max(colLeft.getBoundingClientRect().height, colRight.getBoundingClientRect().height);
-    var slot = (sideH - bw * 0.26 - badgeH) / 8;
-    slot = Math.max(bw * 0.62, Math.min(bw * 1.18, slot));
+    var tallB = null;
+    game.bottles.forEach(function (b) { if (b.tall) tallB = b; });
+    var cap = tallB ? tallB.cap : 8;
+    var slot = (sideH - badgeH - bw * 0.42) / cap;
+    slot = Math.max(bw * 0.55, Math.min(bw * 1.20, slot));
     stageEl.style.setProperty('--tall-slot', slot.toFixed(2) + 'px');
   } else {
     stageEl.style.removeProperty('--tall-slot');
@@ -1111,7 +1229,7 @@ function doPour(fromId, toId, amount) {
 
   if (isWin(game.bottles)) { onWin(); return; }
   if (isComplete(to)) {
-    setStatus(to.tall ? '가운데 병에 ' + COLOR_NAMES[to.goal] + ' 8칸을 다 모았어요!'
+    setStatus(to.tall ? '가운데 병에 ' + COLOR_NAMES[to.goal] + ' ' + to.cap + '칸을 다 모았어요!'
                       : '한 병 완성 — 뚜껑을 닫았어요');
   } else if (to.tall) {
     setStatus('가운데 병에 ' + COLOR_NAMES[to.goal] + ' ' + to.cells.length + '/' + to.cap + '칸 — ' +
@@ -1220,6 +1338,7 @@ function startLevel(level, seed) {
   game.cfg = gen.cfg;
   game.goal = gen.goal;
   game.bottles = gen.bottles;
+  game.tiers = gen.cfg.tiers;
   game.moves = 0;
   game.history = [];
   game.selected = null;
@@ -1237,7 +1356,7 @@ function startLevel(level, seed) {
   var goalBottle = null;
   game.bottles.forEach(function (b) { if (b.tall) goalBottle = b; });
   setStatus(goalBottle
-    ? '가운데 병은 비어 있어요 — ' + COLOR_NAMES[goalBottle.goal] + ' 8칸을 모아 채우면 클리어'
+    ? '가운데 병은 비어 있어요 — ' + COLOR_NAMES[goalBottle.goal] + ' ' + goalBottle.cap + '칸을 모아 채우면 클리어'
     : '병을 눌러 고른 뒤, 다른 병을 눌러 부으세요');
 
   window.scrollTo(0, 0);
@@ -1341,56 +1460,107 @@ window.__wsp = {
   /* 생성기 전수 검증: 모든 레벨/시드의 판이 '실제 규칙'으로 풀리는지 확인 */
   selfTest: function (levels, seeds) {
     levels = levels || 12; seeds = seeds || 30;
-    var report = [], allOk = true, minMoves = Infinity, maxMoves = 0, fails = [];
-    var tallZeroFail = 0, emptyBottleStat = [], bottleStat = [];
+    var report = [], allOk = true, minSteps = Infinity, maxSteps = 0, sumSteps = 0;
+    var fails = [], cases = 0, sumMixed = 0, sumDone = 0, slowestMs = 0, sumMs = 0;
+    var levelSpec = [];
     for (var L = 1; L <= levels; L++) {
+      var cfgL = levelConfig(L);
+      var spec = { level: L, normal: cfgL.normalBottles, tall: cfgL.tallCap, colors: cfgL.colors,
+                   tiers: cfgL.tiers, units: cfgL.units };
+      if (L <= 4 || L === 5 || L === 9 || L === 10 || L === 19 || L === 20 || L === 36 || L === levels) levelSpec.push(spec);
       for (var s = 1; s <= seeds; s++) {
         var seed = s * 7919 + L * 104729;
+        var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
         var g = generateLevel(L, seed);
-        var st = g.bottles.map(function (b) { return { cells: b.cells.slice(), cap: b.cap, tall: b.tall, goal: b.goal, levelGoal: b.levelGoal }; });
-        var alreadyWon = isWin(st);
+        var ms = ((window.performance && performance.now) ? performance.now() : Date.now()) - t0;
+        if (ms > slowestMs) slowestMs = ms;
+        sumMs += ms;
+        cases++;
+        if (!g) { allOk = false; if (fails.length < 8) fails.push({ level: L, seed: seed, null: true }); continue; }
 
-        /* 시작 상태 검사: 긴 병은 0칸, 목표 색은 정확히 8칸이 일반 병들에 */
-        var tallStart = -1, goalCells = 0, emptyBottles = 0, i2;
-        for (i2 = 0; i2 < st.length; i2++) {
-          if (st[i2].tall) tallStart = st[i2].cells.length;
-          else if (!st[i2].cells.length) emptyBottles++;
-          for (var j2 = 0; j2 < st[i2].cells.length; j2++) if (st[i2].cells[j2] === g.goal) goalCells++;
+        var signs = g.bottles.map(function (b) { return { cells: b.cells.slice(), cap: b.cap, tall: b.tall, goal: b.goal, levelGoal: b.levelGoal }; });
+        var alreadyWon = isWin(signs);
+
+        /* 1) 병 구성: 일반 병 수, 긴 병 용량, 색별 칸 수 */
+        var tallStart = -1, emptyBottles = 0, goalCells = 0, normals = 0, i2, j2;
+        var perColor = {};
+        for (i2 = 0; i2 < signs.length; i2++) {
+          var b2 = signs[i2];
+          if (b2.tall) { tallStart = b2.cells.length; continue; }
+          normals++;
+          if (!b2.cells.length) emptyBottles++;
+          for (j2 = 0; j2 < b2.cells.length; j2++) {
+            var col = b2.cells[j2];
+            perColor[col] = (perColor[col] || 0) + 1;
+            if (col === g.goal) goalCells++;
+          }
         }
-        var startOk = !g.cfg.tall || (tallStart === 0 && goalCells === 8);
-        if (!startOk) tallZeroFail++;
+        var shapeOk = normals === g.cfg.normalBottles &&
+                      (!g.cfg.tall || (tallStart === 0 && goalCells === g.cfg.tallCap)) &&
+                      (!g.cfg.tall || signs.length === g.cfg.normalBottles + 1);
+        if (!g.cfg.tall) shapeOk = normals === g.cfg.normalBottles && !alreadyWon;
 
+        /* 2) 색별 칸 수가 counts×4 와 정확히 맞는가 */
+        var colorOk = true, ci, copiesCheck = {};
+        for (i2 = 0; i2 < signs.length; i2++) if (!signs[i2].tall) {
+          var top = signs[i2].cells[0];
+          if (top === undefined) continue;
+          copiesCheck[top] = (copiesCheck[top] || 0) + 1;
+        }
+        for (ci = 0; ci < g.cfg.colors; ci++) {
+          var n = perColor[ci] || 0;
+          if (ci === g.goal) { if (n !== g.cfg.tallCap) colorOk = false; }
+          else if (n % 4 !== 0 || n < 4) colorOk = false;
+        }
+
+        /* 3) 역재생: 실제 규칙으로 풀리는가 */
         var replayOk = true, steps = 0, lockViolation = false;
         for (var i = g.moves.length - 1; i >= 0; i--) {
           var mv = g.moves[i];
-          if (isComplete(st[mv[1]])) lockViolation = true;      // 정방향 출발 병이 뚜껑 닫힘?
-          var amt = applyPour(st, mv[1], mv[0]);                // 역연산이므로 정방향은 A→B
+          if (isComplete(signs[mv[1]])) lockViolation = true;      // 정방향 출발 병이 뚜껑 닫힘?
+          var amt = applyPour(signs, mv[1], mv[0]);                // 역연산이므로 정방향은 A→B
           if (amt !== mv[2]) { replayOk = false; break; }
           steps++;
         }
-        var solved = isWin(st);
-        /* 다 푼 뒤 모습: 긴 병은 목표 색 8칸, 일반 병은 4칸씩으로 정리되는가 */
+        var solved = isWin(signs);
+
+        /* 4) 푼 뒤 모습: 긴 병은 목표 색 가득, 일반 병은 4칸 완성 또는 빈 병 */
         var goalOk = true;
         if (g.cfg.tall) {
-          var tall = null;
-          for (i2 = 0; i2 < st.length; i2++) if (st[i2].tall) tall = st[i2];
-          goalOk = !!tall && tall.goal === g.goal && tall.cells.length === 8;
-          for (i2 = 0; i2 < tall.cells.length; i2++) if (tall.cells[i2] !== g.goal) goalOk = false;
+          var tallB = null;
+          for (i2 = 0; i2 < signs.length; i2++) if (signs[i2].tall) tallB = signs[i2];
+          goalOk = !!tallB && tallB.cells.length === g.cfg.tallCap;
+          if (goalOk) for (i2 = 0; i2 < tallB.cells.length; i2++) if (tallB.cells[i2] !== g.goal) goalOk = false;
         }
-        var ok = replayOk && solved && !alreadyWon && !lockViolation && goalOk && startOk;
-        if (!ok) { allOk = false; if (fails.length < 6) fails.push({ level: L, seed: seed, replay: replayOk, solved: solved, won: alreadyWon, lock: lockViolation, goal: goalOk, start: startOk }); }
-        if (steps < minMoves) minMoves = steps;
-        if (steps > maxMoves) maxMoves = steps;
-        emptyBottleStat.push(emptyBottles);
-        bottleStat.push(g.bottles.length);
-        if (L <= 3 && s <= 3) {
-          report.push({ level: L, seed: seed, bottles: g.bottles.length, colors: g.cfg.colors, tall: g.cfg.tall, goal: g.goal, tallStart: tallStart, empty: emptyBottles, scramble: g.moves.length, replay: steps, ok: ok });
+        for (i2 = 0; i2 < signs.length; i2++) {
+          var bb = signs[i2];
+          if (!bb.cells.length) continue;
+          if (bb.cells.length !== bb.cap) goalOk = false;
+        }
+
+        var ok = replayOk && solved && !alreadyWon && !lockViolation && goalOk && shapeOk && colorOk;
+        if (!ok) {
+          allOk = false;
+          if (fails.length < 8) fails.push({ level: L, seed: seed, replay: replayOk, solved: solved,
+            won: alreadyWon, lock: lockViolation, goal: goalOk, shape: shapeOk, color: colorOk,
+            normals: normals, tallStart: tallStart, goalCells: goalCells });
+        }
+        if (steps < minSteps) minSteps = steps;
+        if (steps > maxSteps) maxSteps = steps;
+        sumSteps += steps;
+        sumMixed += g.mixed;
+        sumDone += g.done;
+        if (L <= 2 && s <= 2) {
+          report.push({ level: L, seed: seed, bottles: g.bottles.length, colors: g.cfg.colors, tall: g.cfg.tall,
+                        goal: g.goal, tallStart: tallStart, empty: emptyBottles, scramble: g.moves.length, replay: steps, ok: ok });
         }
       }
     }
     function avg(a) { var t = 0, i; for (i = 0; i < a.length; i++) t += a[i]; return a.length ? t / a.length : 0; }
-    return { allOk: allOk, minMoves: minMoves, maxMoves: maxMoves, fails: fails, samples: report,
-             tallZeroFail: tallZeroFail, avgEmpty: avg(emptyBottleStat), avgBottles: avg(bottleStat), cases: bottleStat.length };
+    return { allOk: allOk, minSteps: minSteps, maxSteps: maxSteps, avgSteps: cases ? sumSteps / cases : 0,
+             fails: fails, samples: report, levelSpec: levelSpec,
+             avgMixed: cases ? sumMixed / cases : 0, avgDone: cases ? sumDone / cases : 0,
+             avgMs: cases ? sumMs / cases : 0, slowestMs: slowestMs, cases: cases };
   }
 };
 </script>
