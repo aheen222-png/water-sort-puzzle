@@ -2314,14 +2314,16 @@ var Room = (function () {
     '</g>';
   }
   function artCape(u) {
+    /* 어깨 망토 — 펫 앞쪽에 걸쳐 입는 형태 (흰 모피 단 + 금 클라스프) */
     return '<g>' +
-      '<path d="M30 8Q50 0 70 8l18 56q-38 10-76 0z" fill="#B3243B"/>' +
-      '<path d="M50 12l20 52q-20 6-40 0z" fill="#96182E" opacity=".5"/>' +
-      '<path d="M28 6L12 66l12 4 14-58z" fill="#FBFBF7"/>' +
-      '<path d="M72 6l16 60-12 4-14-58z" fill="#FBFBF7"/>' +
-      '<g fill="#2B2B2B" opacity=".8"><circle cx="19" cy="30" r="1.6"/><circle cx="16" cy="48" r="1.6"/><circle cx="81" cy="30" r="1.6"/><circle cx="84" cy="48" r="1.6"/></g>' +
-      '<circle cx="50" cy="28" r="3.8" fill="url(#' + u + 'gold)"/>' +
-      '<path d="M50 24v8" stroke="#B77C14" stroke-width=".8"/>' +
+      '<path d="M20 27q30-21 60 0l9 33q-39 13-78 0z" fill="#B3243B"/>' +
+      '<path d="M20 27q30-21 60 0l2.4 7.5q-32 9-64.8 0z" fill="#8F1B2B"/>' +
+      '<path d="M11 58q39 14 78 0l2.4 8q-41.4 15-82.8 0z" fill="#FBFBF7"/>' +
+      '<path d="M11 58q39 14 78 0" fill="none" stroke="#D9CFC2" stroke-width="1.1" opacity=".8"/>' +
+      '<path d="M50 21l-6.6-5.4 2 12L50 35l4.6-7.4 2-12z" fill="url(#' + u + 'gold)" stroke="#B77C14" stroke-width=".8" stroke-linejoin="round"/>' +
+      '<circle cx="50" cy="30" r="3.4" fill="url(#' + u + 'gold)" stroke="#B77C14" stroke-width=".7"/>' +
+      '<path d="M24 34q26-13 52 0" fill="none" stroke="#7E1526" stroke-width="1.1" opacity=".45"/>' +
+      '<g fill="#2B2B2B" opacity=".55"><circle cx="24" cy="62" r="1.5"/><circle cx="76" cy="62" r="1.5"/></g>' +
     '</g>';
   }
 
@@ -2479,9 +2481,9 @@ var Room = (function () {
 
   /* 모자: 펫 폭(w) 대비 상대 배치. a='base'는 모자 밑동, a='center'는 눈높이 */
   var HAT_FIT = {
-    hat_paper:   { y: 0.283, a: 'base',   s: 0.64 },
+    hat_paper:   { y: 0.283, a: 'base',   s: 0.60 },
     hat_beret:   { y: 0.340, a: 'base',   s: 0.74 },
-    hat_crown:   { y: 0.283, a: 'base',   s: 0.70 },
+    hat_crown:   { y: 0.278, a: 'base',   s: 0.62 },
     hat_glasses: { y: 0.410, a: 'center', s: 0.62 }
   };
   /* 의상: 펫 폭 대비 상대 배치 (y: 목선 위치 비율, ay: 그림 기준점, s: 크기) */
@@ -2489,7 +2491,7 @@ var Room = (function () {
     outfit_rag:  { y: 0.650, ay: 0,  s: 0.40 },
     outfit_tee:  { y: 0.575, ay: 0,  s: 0.54 },
     outfit_tux:  { y: 0.575, ay: 0,  s: 0.52 },
-    outfit_cape: { y: 0.540, ay: 0,  s: 0.72, behind: true }
+    outfit_cape: { y: 0.520, ay: 0,  s: 0.76 }
   };
 
   /* 펫 자리 — 마리 수별 좌표(x: 중심, b: 발바닥 y, w: 펫 크기) */
