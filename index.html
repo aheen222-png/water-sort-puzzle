@@ -3595,7 +3595,7 @@ var Room = (function () {
       note.hidden = !(lvLock || short);
       note.textContent = lvLock
         ? ('Lv.' + req + ' 달성 시 구매 가능 · 지금 Lv.' + lv)
-        : ('코인 ' + fmt(it.price - RS.coins) + '개 더 모으면 살 수 있어요');
+        : ('코인 ' + fmt(Math.max(0, it.price - RS.coins)) + '개 더 모으면 살 수 있어요');
     }
     if (b) {
       b.disabled = lvLock;
