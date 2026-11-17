@@ -2214,7 +2214,17 @@ var Room = (function () {
     { id: 'outfit_tux',   slot: 'outfit', name: '리본 턱시도',      price: 240, req: 26, tag: '럭셔리' },
     { id: 'outfit_cape',  slot: 'outfit', name: '로열 망토',        price: 520, req: 75, tag: '궁궐' },
 
-    /* ---- 방: 벽지 8종 ---- */
+    /* ---- 방: 벽장식 8종 (벽에 거는 장식 — 벽지 대신) ---- */
+    { id: 'wd_none',      slot: 'walldeco', name: '장식 없음',       price: 0,   req: 1,  tag: '기본' },
+    { id: 'wd_garland',   slot: 'walldeco', name: '종이 가랜드',     price: 90,  req: 4,  tag: '소박' },
+    { id: 'wd_poster',    slot: 'walldeco', name: '고양이 캘린더',   price: 150, req: 11, tag: '아기자기' },
+    { id: 'wd_clock',     slot: 'walldeco', name: '빈티지 벽시계',   price: 230, req: 19, tag: '빈티지' },
+    { id: 'wd_dream',     slot: 'walldeco', name: '드림캐처',        price: 330, req: 28, tag: '몽환' },
+    { id: 'wd_curtain',   slot: 'walldeco', name: '체크 커튼',       price: 430, req: 40, tag: '아늑' },
+    { id: 'wd_fairy',     slot: 'walldeco', name: '별빛 줄조명',     price: 560, req: 55, tag: '네온' },
+    { id: 'wd_laurel',    slot: 'walldeco', name: '황금 월계수 휘장', price: 720, req: 70, tag: '궁궐' },
+
+    /* ---- 방: 벽지 8종 (지금은 쓰지 않는 옛 그림 — 상점에는 안 나온다) ---- */
     { id: 'wall_old',     slot: 'wall',    name: '낡은 벽지',        price: 0,   req: 1,  tag: '기본' },
     { id: 'wall_cream',   slot: 'wall',    name: '크림 플로럴',      price: 90,  req: 8,  tag: '소박' },
     { id: 'wall_mint',    slot: 'wall',    name: '민트 스트라이프',  price: 160, req: 16, tag: '산뜻' },
@@ -2280,6 +2290,7 @@ var Room = (function () {
 
   /* 방 꾸미기 칸 — 꾸미기 탭의 카테고리 순서 */
   var SLOTS = [
+    { id: 'walldeco', label: '벽장식', hint: '벽에 걸어 방 분위기를 내는 장식', def: 'wd_none' },
     { id: 'bed',    label: '침대', hint: '방 가운데 놓고 친구가 올라앉는 침대', def: 'bed_box' },
     { id: 'frame',  label: '액자', hint: '벽에 거는 그림과 사진',   def: 'frame_empty' },
     { id: 'rug',    label: '러그', hint: '바닥 가운데 까는 러그',   def: 'rug_none' },
@@ -2313,7 +2324,7 @@ var Room = (function () {
 
   var RS = { coins: 0, grade: 1, maxGrade: 1, pets: [], lead: 0, owned: {}, equipped: defaultEquipped() };
   var curTab = 'pets';
-  var decoSlot = 'bed';
+  var decoSlot = 'walldeco';
   /* 미리보기 — 칸(슬롯)마다 따로 기억해서 침대·모자·의상·조명을 겹쳐 코디해 볼 수 있다 */
   var pvSlots = {};          /* { slot: itemId } 미구입 아이템 미리보기 */
   var pvFocus = null;        /* 구매 바에 띄울 대상 {kind:'item', id} | {kind:'grade', n} */
@@ -2532,6 +2543,15 @@ var Room = (function () {
       case 'wall_old': case 'wall_cream': case 'wall_mint': case 'wall_blue':
       case 'wall_rose': case 'wall_brick': case 'wall_star': case 'wall_gold':
         return artWallSwatch(id, u);
+
+      case 'wd_none': return artWdNone();
+      case 'wd_garland': return artWdGarland();
+      case 'wd_poster': return artWdPoster();
+      case 'wd_clock': return artWdClock();
+      case 'wd_dream': return artWdDream();
+      case 'wd_curtain': return artWdCurtain(u);
+      case 'wd_fairy': return artWdFairy(u);
+      case 'wd_laurel': return artWdLaurel(u);
 
       case 'frame_empty': return artFrameEmpty();
       case 'frame_photo': return artFramePhoto();
@@ -3305,6 +3325,186 @@ var Room = (function () {
   }
 
   /* =====================================================================
+     벽장식 — 벽에 거는 장식 7종 (100×100 상자 기준, 방에는 WALL_FIT 으로 배치)
+     액자(왼쪽 벽 34~86 · 40~76)·천장 조명(가운데 150~208 · 0~58)·
+     오른쪽 소품·침대·친구와 겹치지 않는 자리에만 놓는다.
+     ===================================================================== */
+
+  /* 장식 없음 — 목록에서 "비어 있는 벽" 임을 보여 주는 점선 틀 */
+  function artWdNone() {
+    return '<g opacity=".55">' +
+      '<rect x="16" y="18" width="68" height="64" rx="6" fill="none" stroke="#9fb0da" stroke-width="2" stroke-dasharray="6 6"/>' +
+      '<path d="M26 78L74 22" stroke="#9fb0da" stroke-width="2.4" stroke-linecap="round"/>' +
+      '<circle cx="50" cy="50" r="4" fill="#9fb0da" opacity=".55"/>' +
+    '</g>';
+  }
+
+  /* 종이 가런드 — 양 끝을 벽에 고정하고 가운데가 처지는 천막 깃발 한 줄 */
+  function artWdGarland() {
+    var cols = ['#F4A3B7', '#FFD98A', '#A8DCC8', '#BACAF2', '#F5B778'], s = '<g>', i, t, x, y;
+    s += '<path d="M0 4Q50 48 100 4" fill="none" stroke="#7E6141" stroke-width="1.5" stroke-linecap="round"/>';
+    for (i = 1; i <= 9; i++) {
+      t = i / 10; x = 100 * t;
+      y = (1 - t) * (1 - t) * 4 + 2 * (1 - t) * t * 48 + t * t * 4;
+      s += '<path d="M' + (x - 5.6).toFixed(1) + ' ' + y.toFixed(1) + 'L' + (x + 5.6).toFixed(1) + ' ' + y.toFixed(1) +
+           'L' + x.toFixed(1) + ' ' + (y + 12.5).toFixed(1) + 'z" fill="' + cols[(i - 1) % cols.length] + '"/>';
+      s += '<path d="M' + (x - 5.6).toFixed(1) + ' ' + y.toFixed(1) + 'L' + (x + 5.6).toFixed(1) + ' ' + y.toFixed(1) +
+           'L' + (x + 4.4).toFixed(1) + ' ' + (y + 2.6).toFixed(1) + 'L' + (x - 4.4).toFixed(1) + ' ' + (y + 2.6).toFixed(1) +
+           'z" fill="#FFFFFF" opacity=".26"/>';
+      s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="1" fill="#7E6141"/>';
+    }
+    s += '<path d="M0 4l-2.5-4M100 4l2.5-4" stroke="#7E6141" stroke-width="1.6" stroke-linecap="round"/>';
+    return s + '</g>';
+  }
+
+  /* 고양이 캘린더 — 위에 고양이 얼굴, 아래에 달력 칸 */
+  function artWdPoster() {
+    var s = '<g>', i, j;
+    s += '<rect x="20" y="5" width="60" height="92" rx="2" fill="#2A2033" opacity=".16"/>';
+    s += '<rect x="18" y="2" width="60" height="92" rx="2" fill="#FFFCF4" stroke="#E4D6BC" stroke-width="1"/>';
+    s += '<rect x="18" y="2" width="60" height="16" rx="2" fill="#F4A9BC"/>';
+    s += '<path d="M22 18h52" stroke="#E58CA4" stroke-width="1.6"/>';
+    /* 고양이 얼굴 */
+    s += '<g transform="translate(48,38)">' +
+      '<path d="M-13-7l-1-11 9 5zM10-7l1-11-9 5z" fill="#F7C98E"/>' +
+      '<circle cx="0" cy="0" r="12.5" fill="#FBD8A2"/>' +
+      '<path d="M-12 2q4 9 12 9t12-9z" fill="#F7C98E" opacity=".55"/>' +
+      '<circle cx="-4.6" cy="-1.5" r="1.7" fill="#3B2E28"/><circle cx="4.6" cy="-1.5" r="1.7" fill="#3B2E28"/>' +
+      '<path d="M0 2.6l1.6 1.6-1.6 1.4-1.6-1.4z" fill="#E0748C"/>' +
+      '<path d="M-9 3.5l-6-1M-9 6l-6 1.4M9 3.5l6-1M9 6l6 1.4" stroke="#C99A63" stroke-width=".9" stroke-linecap="round"/>' +
+      '<path d="M-2.4 6q2.4 2 4.8 0" fill="none" stroke="#C4707F" stroke-width=".9" stroke-linecap="round"/>' +
+      '</g>';
+    /* 달력 칸 */
+    s += '<rect x="23" y="58" width="50" height="30" rx="2" fill="#FBF3E3"/>';
+    for (j = 0; j < 3; j++) for (i = 0; i < 5; i++) {
+      s += '<rect x="' + (25.5 + i * 9.4) + '" y="' + (60.5 + j * 9) + '" width="7.2" height="6.6" rx="1" fill="#EFE1C8"/>';
+    }
+    s += '<rect x="25.5" y="60.5" width="7.2" height="6.6" rx="1" fill="#F4A9BC"/>';
+    s += '<path d="M30 2v-2M66 2v-2" stroke="#D9C6A4" stroke-width="1.4" stroke-linecap="round"/>';
+    return s + '</g>';
+  }
+
+  /* 빈티지 벽시계 — 나무 테두리, 10시 10분 */
+  function artWdClock() {
+    var s = '<g>', i, a, r1, r2, x1, y1, x2, y2;
+    s += '<circle cx="50" cy="55" r="44" fill="#5E3D22"/>';
+    s += '<circle cx="50" cy="55" r="44" fill="none" stroke="#33200E" stroke-width="1.2" opacity=".55"/>';
+    s += '<circle cx="50" cy="55" r="38" fill="#FBF1DC"/>';
+    s += '<circle cx="50" cy="55" r="38" fill="none" stroke="#D9BE84" stroke-width="2"/>';
+    for (i = 0; i < 12; i++) {
+      a = i * Math.PI / 6; r1 = (i % 3 === 0) ? 27 : 31; r2 = 35;
+      x1 = 50 + Math.sin(a) * r1; y1 = 55 - Math.cos(a) * r1;
+      x2 = 50 + Math.sin(a) * r2; y2 = 55 - Math.cos(a) * r2;
+      s += '<path d="M' + x1.toFixed(1) + ' ' + y1.toFixed(1) + 'L' + x2.toFixed(1) + ' ' + y2.toFixed(1) +
+           '" stroke="#8B6B3E" stroke-width="' + (i % 3 === 0 ? 2.6 : 1.5) + '" stroke-linecap="round"/>';
+    }
+    s += '<path d="M50 55L36 43" stroke="#4A3524" stroke-width="3.8" stroke-linecap="round"/>';
+    s += '<path d="M50 55L64 38" stroke="#4A3524" stroke-width="2.6" stroke-linecap="round"/>';
+    s += '<circle cx="50" cy="55" r="3.6" fill="#C9A24A"/><circle cx="50" cy="55" r="1.5" fill="#7E5A2E"/>';
+    s += '<path d="M50 11V5" stroke="#C9A24A" stroke-width="2.6" stroke-linecap="round"/>';
+    s += '<circle cx="50" cy="4" r="3.4" fill="none" stroke="#C9A24A" stroke-width="1.8"/>';
+    return s + '</g>';
+  }
+
+  /* 드림캐처 — 고리 · 거미줄 · 구슬 · 깃털 */
+  function artWdDream() {
+    var s = '<g>', i, a, x, y, fd = [[38, 57, '#8FCFC4'], [50, 63, '#F3B2C4'], [62, 55, '#C9B8EE']];
+    s += '<path d="M50 2v7" stroke="#C9A77C" stroke-width="1.4"/>';
+    s += '<circle cx="50" cy="2.6" r="1.7" fill="#B98F5F"/>';
+    s += '<circle cx="50" cy="30" r="22" fill="#FBF1DE" opacity=".8"/>';
+    s += '<circle cx="50" cy="30" r="22" fill="none" stroke="#8B5E34" stroke-width="1.4"/>';
+    s += '<circle cx="50" cy="30" r="22" fill="none" stroke="#C08A52" stroke-width="3.4"/>';
+    s += '<circle cx="50" cy="30" r="18.4" fill="none" stroke="#DDB37C" stroke-width="1.1"/>';
+    for (i = 0; i < 8; i++) {
+      a = i * Math.PI / 4;
+      s += '<path d="M50 30L' + (50 + Math.cos(a) * 19.5).toFixed(1) + ' ' + (30 + Math.sin(a) * 19.5).toFixed(1) +
+           '" stroke="#E3C39A" stroke-width=".9" opacity=".85"/>';
+    }
+    s += '<circle cx="50" cy="30" r="7.6" fill="none" stroke="#E3C39A" stroke-width=".9" opacity=".8"/>';
+    s += '<circle cx="50" cy="30" r="13" fill="none" stroke="#E3C39A" stroke-width=".9" opacity=".7"/>';
+    s += '<circle cx="50" cy="30" r="3" fill="#E2B36B"/>';
+    for (i = 0; i < fd.length; i++) {
+      x = fd[i][0]; y = fd[i][1];
+      s += '<path d="M' + x + ' 51v' + (y - 51) + '" stroke="#C9A77C" stroke-width="1"/>';
+      s += '<circle cx="' + x + '" cy="' + y + '" r="2.6" fill="#E8D3B4" stroke="#C09A63" stroke-width=".7"/>';
+      s += '<path d="M' + x + ' ' + (y + 2.4) + 'v' + (13 + i * 2) + '" stroke="#C9A77C" stroke-width="1"/>';
+      s += '<path d="M' + x + ' ' + (y + 5) + 'q5 ' + (7 + i * 2) + ' 0 ' + (15 + i * 3) + 'q-5 -' + (8 + i * 2) + ' 0 -' + (15 + i * 3) + 'z" fill="' + fd[i][2] + '"/>';
+      s += '<path d="M' + x + ' ' + (y + 8) + 'q0 ' + (4 + i * 2) + ' 0 ' + (8 + i * 2) + '" stroke="#FFFFFF" stroke-width=".8" opacity=".65"/>';
+    }
+    return s + '</g>';
+  }
+
+  /* 체크 커튼 — 금봉에 달린 커튼 한 장 (좌우에 한 장씩 놓아 창가를 만든다) */
+  function artWdCurtain(u) {
+    var s = '<g>', i, j, body = 'M5 5h40v66q0 6-5 10H10Q5 77 5 71z';
+    s += '<clipPath id="' + u + 'cu"><path d="' + body + '"/></clipPath>';
+    s += '<path d="' + body + '" fill="#FCEAF0"/>';
+    s += '<g clip-path="url(#' + u + 'cu)">';
+    for (i = 0; i < 7; i++) s += '<rect x="' + (4 + i * 6) + '" y="0" width="3" height="100" fill="#F2B4C6" opacity=".8"/>';
+    for (j = 0; j < 11; j++) s += '<rect x="0" y="' + (7 + j * 8) + '" width="50" height="3" fill="#F2B4C6" opacity=".8"/>';
+    s += '</g>';
+    /* 아래는 물결 — 커트린처럼 보이게 */
+    s += '<path d="M5 78q6 6 12 0t12 0 12 0 4-3" fill="none" stroke="#E39DB2" stroke-width="1.6" stroke-linecap="round"/>';
+    s += '<path d="' + body + '" fill="none" stroke="#E39DB2" stroke-width="1"/>';
+    s += '<path d="M13 7v66M21 7v70M29 7v70M37 7v68" stroke="#EBA9BC" stroke-width="1" opacity=".45"/>';
+    /* 묶음 끈 */
+    s += '<rect x="5" y="48" width="40" height="5" rx="2.5" fill="#E2768F"/>';
+    s += '<path d="M45 50.5l7-4-1 8z" fill="#E2768F"/><path d="M45 50.5l7 4-1-8z" fill="#D5637C"/>';
+    /* 금봉 */
+    s += '<rect x="1" y="1.5" width="48" height="4.4" rx="2.2" fill="#B98B49"/>';
+    s += '<rect x="1" y="1.5" width="48" height="1.6" rx=".8" fill="#D8AE66"/>';
+    s += '<circle cx="1.5" cy="3.7" r="2.8" fill="#C9A24A"/><circle cx="48.5" cy="3.7" r="2.8" fill="#C9A24A"/>';
+    s += '<path d="M10 4.5v5M40 4.5v5" stroke="#E0C8A0" stroke-width="1.2"/>';
+    return s + '</g>';
+  }
+
+  /* 별빛 줄조명 — 가는 줄에 작은 별 전구 */
+  function artWdFairy(u) {
+    var s = '<g>', i, t, x, y, cols = ['#FFE9A3', '#FFC2DA', '#B8E8FF'];
+    s += '<path d="M0 4Q50 34 100 4" fill="none" stroke="#7C6E62" stroke-width="1.1" stroke-linecap="round"/>';
+    for (i = 1; i <= 7; i++) {
+      t = i / 8; x = 100 * t;
+      y = (1 - t) * (1 - t) * 4 + 2 * (1 - t) * t * 34 + t * t * 4;
+      s += '<path d="M' + x.toFixed(1) + ' ' + y.toFixed(1) + 'v2.4" stroke="#7C6E62" stroke-width=".9"/>';
+      s += '<circle cx="' + x.toFixed(1) + '" cy="' + (y + 6).toFixed(1) + '" r="9" fill="' + cols[(i - 1) % 3] + '" opacity=".26"/>' +
+           '<circle cx="' + x.toFixed(1) + '" cy="' + (y + 6).toFixed(1) + '" r="5.2" fill="' + cols[(i - 1) % 3] + '" opacity=".5"/>';
+      s += '<path d="M' + x.toFixed(1) + ' ' + (y + 1.4).toFixed(1) + 'l1.5 3.1 3.4.5-2.5 2.4.6 3.4-3-1.6-3 1.6.6-3.4-2.5-2.4 3.4-.5z" fill="#FFFDF2" stroke="' + cols[(i - 1) % 3] + '" stroke-width=".9" stroke-linejoin="round"/>';
+      s += '<path d="M' + x.toFixed(1) + ' ' + (y + 3).toFixed(1) + 'l1 2.1 2.3.3" stroke="#FFFFFF" stroke-width=".8" opacity=".7" fill="none"/>';
+    }
+    s += '<path d="M0 4l-2-4M100 4l2-4" stroke="#7C6E62" stroke-width="1.3" stroke-linecap="round"/>';
+    return s + '</g>';
+  }
+
+  /* 황금 월계수 휘장 — 황금 고리에 잎을 두른 월계수 관, 가운데 별, 아래 리본 */
+  function artWdLaurel(u) {
+    var s = '<g>', i, a, d2r = Math.PI / 180, R = 29, x, y;
+    s += '<ellipse cx="50" cy="47" rx="35" ry="35" fill="url(#' + u + 'glow)" opacity=".45"/>';
+    /* 밝은 방에서도 보이게 깔는 어두운 테 */
+    s += '<circle cx="50" cy="47" r="' + R + '" fill="none" stroke="#43270E" stroke-width="9" opacity=".32"/>';
+    /* 크림색 바탕 — 금빛 방 벽에서도 흐장 안에 휘장이 살아난다 */
+    s += '<circle cx="50" cy="47" r="26" fill="#FFF8E6" opacity=".93"/>';
+    s += '<circle cx="50" cy="47" r="26" fill="none" stroke="#C9A24A" stroke-width="1.4"/>';
+    /* 고리 — 두른 잎을 방울처럼 찍어 낸다 */
+    s += '<circle cx="50" cy="47" r="' + R + '" fill="none" stroke="#8E6413" stroke-width="7.4" opacity=".55"/>';
+    s += '<circle cx="50" cy="47" r="' + R + '" fill="none" stroke="url(#' + u + 'gold)" stroke-width="6.2" stroke-dasharray="5.4 3.6" stroke-linecap="round"/>';
+    s += '<circle cx="50" cy="47" r="' + (R - 5.6) + '" fill="none" stroke="#E7C97E" stroke-width="1.2" opacity=".85"/>';
+    /* 위쪽 두 갈래 잎 */
+    for (i = 0; i < 2; i++) {
+      a = i ? 32 : 148;
+      x = 50 + R * Math.cos(a * d2r); y = 47 + R * Math.sin(a * d2r);
+      s += '<g transform="translate(' + x.toFixed(1) + ',' + y.toFixed(1) + ') rotate(' + (a + (i ? -42 : 42)) + ')">' +
+           '<path d="M0 0q8 -3 13 -.4q-5 3.6 -13 2.4z" fill="url(#' + u + 'gold)" stroke="#8E6413" stroke-width=".4" stroke-opacity=".5"/></g>';
+    }
+    /* 가운데 별 */
+    s += '<path d="M50 31l3.5 8.6 9.2.7-7.2 6 2.4 8.9L50 50.6l-7.9 4.6 2.4-8.9-7.2-6 9.2-.7z" fill="url(#' + u + 'gold)" stroke="#8E6413" stroke-width=".8"/>';
+    s += '<circle cx="50" cy="44.6" r="1.7" fill="#FFF6D8"/>';
+    /* 아래 리본 */
+    s += '<path d="M39 73.5h22l-3.6 7-7.4-2.8-7.4 2.8z" fill="#B6323F"/>';
+    s += '<path d="M39 73.5h22" stroke="#E2767F" stroke-width="1.1"/>';
+    return s + '</g>';
+  }
+
+  /* =====================================================================
      장면 조립 — 일러스트 방 + 투명 PNG 펫 + 이름표 + 꾸미기 아이템
      ===================================================================== */
   /* ---------- 무대 좌표 (360×240) ----------
@@ -3331,6 +3531,24 @@ var Room = (function () {
   var DECO_FIT = { cx: 322, s: 0.62, floor: FLOOR_Y + 6 };
   var DECO_BOT = { deco_none: 100, deco_plant: 88, deco_shelf: 100, deco_cushion: 96,
                    deco_basket: 92, deco_gramophone: 98, deco_aquarium: 98 };
+  /* ---------- 벽장식 배치 ----------
+     x/y: 방 좌표에 놓일 그림의 가로 중심·위 기준점, s: 배율, ax/ay: 그림 100상자 안의 기준점.
+     두 줄로 된 장식(가런드·커트린·줄조명)은 좌우에 한 장씩 놓는다.
+     액자(34~86 · 40~76) · 가운데 조명(150~208 · 0~58) · 네온(279~323 · 53~79) ·
+     침대(120~240 · 88 이상) · 오른쪽 소품(300~345 · 177 이상) · 상단 배지(y 8~31)를 피한 자리. */
+  var WALL_FIT = {
+    wd_garland: [ { x: 116, y: 44, s: 0.56, ax: 50, ay: 2 },
+                  { x: 244, y: 44, s: 0.56, ax: 50, ay: 2 } ],
+    wd_poster:  [ { x: 103, y: 40, s: 0.47, ax: 50, ay: 2 } ],
+    wd_clock:   [ { x: 258, y: 48, s: 0.355, ax: 50, ay: 2 } ],
+    wd_dream:   [ { x: 105, y: 38, s: 0.52, ax: 50, ay: 2 } ],
+    wd_curtain: [ { x: 135, y: 40, s: 0.44, ax: 25, ay: 0 },
+                  { x: 225, y: 40, s: 0.44, ax: 25, ay: 0 } ],
+    wd_fairy:   [ { x: 116, y: 42, s: 0.56, ax: 50, ay: 0 },
+                  { x: 244, y: 42, s: 0.56, ax: 50, ay: 0 } ],
+    wd_laurel:  [ { x: 258, y: 40, s: 0.46, ax: 50, ay: 4 } ]
+  };
+
   var LIGHT_FIT = {
     light_bulb:      { a: 'top',    x: 180, y: -1,  s: 0.74 },
     light_lantern:   { a: 'top',    x: 180, y: -1,  s: 0.70 },
@@ -3415,6 +3633,18 @@ var Room = (function () {
     else if (f.a === 'top') t = 'translate(' + f.x + ',' + f.y + ') scale(' + f.s + ') translate(-50,0)';
     else t = 'translate(' + f.x + ',' + f.y + ') scale(' + f.s + ') translate(-50,-50)';
     return '<g transform="' + t + '">' + art(id, extra) + '</g>';
+  }
+
+  /* 벽장식 — WALL_FIT 의 자리에 그림을 놓는다 (좌우 한 쌍이면 두 번) */
+  function wallDeco(id, u) {
+    var list = WALL_FIT[id], s = '', i, e;
+    if (!list) return '';
+    for (i = 0; i < list.length; i++) {
+      e = list[i];
+      s += '<g filter="url(#' + u + 'sh)" transform="translate(' + e.x + ',' + e.y + ') scale(' + e.s + ') translate(' +
+           (-(e.ax == null ? 50 : e.ax)) + ',' + (-(e.ay || 0)) + ')">' + art(id, u) + '</g>';
+    }
+    return s;
   }
 
   function nameTag(name, cx, bottom, fs) {
@@ -3558,6 +3788,8 @@ var Room = (function () {
     }
     s += '</defs>';
     s += baseRoom(u, o.grade);
+    /* 벽장식 — 벽에 거는 장식. 액자·조명보다 먼저 그려 뒤에 깔린다 */
+    if (o.walldeco && o.walldeco !== 'wd_none') s += wallDeco(o.walldeco, u);
     /* 액자 (벽면 눈높이) */
     if (o.frame && o.frame !== 'frame_empty') s += place(o.frame, FRAME_FIT, u);
     /* 천장 조명 — 천장 상단 정중앙에 줄을 매달아 내린다 (기본 조명은 방 그림의 전등을 그대로 쓴다) */
@@ -4299,6 +4531,7 @@ if (window.__wsp) {
       rs.equipped.outfit = o.outfit || 'outfit_cape';
       rs.equipped.bed = o.bed || 'bed_canopy';
       rs.equipped.wall = o.wall || 'wall_gold';
+      rs.equipped.walldeco = o.walldeco || 'wd_none';
       rs.equipped.frame = o.frame || 'frame_palace';
       rs.equipped.rug = o.rug || 'rug_gold';
       rs.equipped.light = o.light || 'light_chandelier';
