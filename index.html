@@ -2924,10 +2924,10 @@ var Room = (function () {
       var t = ev.target;
       if (!t || !t.dataset || t.dataset.name === undefined) return;
       var i = parseInt(t.dataset.name, 10);
-      var b = RS.pets[i] ? breedById(RS.pets[i].breed) : null;
-      renamePet(i, t.value || (b ? b.def : '이름'));
+      /* 빈 이름은 품종 기본 이름으로 되돌리고, 그 외에는 화면 갱신 없이 값만 다듬는다
+         (입력 직후 탭·버튼 한 번에 눌리도록 목록 DOM을 다시 그리지 않음) */
+      renamePet(i, t.value);
       t.value = RS.pets[i] ? RS.pets[i].name : '';
-      renderBody(true);
     });
     if (el('roomBody')) el('roomBody').addEventListener('keydown', function (ev) {
       var t = ev.target;
