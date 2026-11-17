@@ -681,6 +681,10 @@ body{
 .grade-chip{ top:9px; bottom:auto; }
 .cap-chip{ top:9px; right:9px; bottom:auto; }
 
+/* 미리보기 중에는 이름표를 잠시 숨겨 자물쇠가 잘 보이게 */
+.stage-art .ntag{ transition:opacity .15s ease; }
+.stage-art.pv .ntag{ opacity:0; }
+
 /* @@ROOM-CSS-END @@ */
 </style>
 </head>
@@ -3450,6 +3454,7 @@ var Room = (function () {
     var st = el('stageArt');
     if (!st) return;
     st.innerHTML = sceneSvg(curLook());
+    st.className = 'stage-art' + (preview ? ' pv' : '');
     var g = RG[RS.grade - 1];
     if (el('gradeChip')) el('gradeChip').textContent = g.n + '단계 · ' + g.name;
     if (el('capChip')) el('capChip').textContent = '🐾 ' + RS.pets.length + '/' + capacity();
