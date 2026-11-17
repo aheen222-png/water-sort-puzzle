@@ -10,22 +10,21 @@
 :root{
   /* 병 폭: 화면 폭/높이 중 작은 쪽에 맞춰 자동 조절 (아이폰 세로 ~ 데스크톱) */
   --bw: clamp(26px, min(11vw, 5.2vh), 62px);
-  /* 아이폰 Safari 하단 floating 툴바가 덮는 영역 — 선반은 이 위에서 멈춘다
-     (노치 기기에서는 safe-area-inset-bottom 이 더해져 약 120px 비워 둔다) */
-  --bottom-hold: calc(env(safe-area-inset-bottom, 0px) + 96px);
 }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-html,body{ margin:0; height:100%; }
+html,body{ margin:0; padding:0; height:100%; max-height:100%; overflow:hidden; overscroll-behavior:none; }
 body{
   font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Malgun Gothic",system-ui,sans-serif;
   color:#e9efff; background:#060a1c; overflow:hidden; overscroll-behavior:none;
   user-select:none; -webkit-user-select:none; touch-action:manipulation;
 }
+/* Safari 의 safe-area-inset-bottom 을 px 로 재기 위한 보이지 않는 자 */
+#safeProbe{ position:fixed; left:0; bottom:0; width:0; height:env(safe-area-inset-bottom, 0px); visibility:hidden; pointer-events:none; }
 #app{
   position:relative; display:flex; flex-direction:column;
-  height:100vh; height:100dvh;
-  /* 아래쪽은 Safari 하단 툴바 자리로 통째로 비워 둔다 (선반·버튼이 겹치지 않게) */
-  padding:max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) var(--bottom-hold) max(6px, env(safe-area-inset-left));
+  height:100vh; height:100dvh; max-height:100vh; max-height:100dvh; overflow:hidden;
+  /* 위/좌/우만 safe-area 를 비우고, 아래쪽 여백은 fitStage() 가 --stage-h 로 정확히 계산한다 */
+  padding:max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
   background:
     radial-gradient(105% 62% at 50% -8%, rgba(96,116,255,.36), rgba(96,116,255,0) 72%),
     radial-gradient(75% 55% at 50% 108%, rgba(128,64,224,.28), rgba(128,64,224,0) 72%),
@@ -70,6 +69,7 @@ body{
 /* ================= 무대 ================= */
 .stage{
   position:relative; z-index:5; flex:1 1 auto; min-height:0;
+  box-sizing:border-box;
   display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
   align-items:center; justify-items:center;
   column-gap:clamp(2px, 1.2vw, 16px);
@@ -323,6 +323,7 @@ body{
 </style>
 </head>
 <body>
+<div id="safeProbe" aria-hidden="true"></div>
 <div id="app">
 
   <header class="hud">
@@ -1039,20 +1040,58 @@ function updateHud() {
 /* 화면에 맞춰 병 크기·선반 단 수 자동 조절 (아이폰 세로 ~ 데스크톱) */
 var GX = 0.10;          // 병 사이·양끝 여백 (병 폭 대비)
 var BOTTLE_H = 3.62;    // 병 한 개 + 선반 두께 (병 폭 대비)
+var BOTTLE_H_4 = 3.40;  // 4단일 때는 병을 한결 납작하게 (아담한 한 화면)
 var TALL_SPAN = 1.09;   // 가운데 긴 병이 차지하는 폭 + 간격
 var MIN_BW = 21;
+/* iPhone Safari 하단 floating 툴바는 화면 맨 아래에서 약 150px 위를 덮는다.
+   선반은 언제나 이 여백 위에서 멈춘다 — safe-area-inset-bottom 때문에 실제로는 더 비운다. */
+var BOTTOM_MIN = 118;
+var BOTTOM_EXTRA = 124;
+
+var appEl = $('#app'), barEl = $('.bar');
+
+function safeBottom() {
+  var p = document.getElementById('safeProbe');
+  return p ? p.offsetHeight : 0;
+}
+
+/* iOS Safari 는 floating 툴바를 화면 위에 겹쳐 띄우므로 innerHeight·dvh 가 실제로 보이는
+   높이보다 클 수 있다. 가능한 후보 중 가장 작은(보수적인) 값을 쓴다. */
+function viewHeight() {
+  var c = [];
+  if (window.innerHeight) c.push(window.innerHeight);
+  if (document.documentElement && document.documentElement.clientHeight) c.push(document.documentElement.clientHeight);
+  if (window.visualViewport && window.visualViewport.height) c.push(window.visualViewport.height);
+  if (!c.length) return 640;
+  return Math.min.apply(null, c);
+}
+
+/* 병·선반이 실제로 놓일 수 있는 높이 — 상단 HUD/버튼줄과 하단 툴바 자리를 뺀 나머지 */
+function stageMetrics() {
+  var appRect = appEl.getBoundingClientRect();
+  var barRect = barEl.getBoundingClientRect();
+  var vh = viewHeight();
+  var appH = Math.min(appRect.height || vh, vh);
+  var top = Math.max(0, (barRect.bottom - appRect.top) + 4);
+  var reserve = Math.max(BOTTOM_MIN, safeBottom() + BOTTOM_EXTRA);
+  return { vh: vh, top: top, reserve: reserve, avail: Math.max(240, appH - top - reserve) };
+}
 
 function planTiers(nL, W, H, tall, badgeH) {
-  var rowGap = Math.max(8, Math.min(22, H * 0.021));
+  var pref = game.cfg ? game.cfg.tiers : 3;
+  var compact = pref >= 4;                   // 4단 선반은 병을 더 아담하게
+  var rowGap = compact ? Math.max(6, Math.min(13, H * 0.014))
+                       : Math.max(8, Math.min(22, H * 0.021));
   var roomH = H - (tall ? badgeH + 8 : 10);
+  var ratio = compact ? BOTTLE_H_4 : BOTTLE_H;
+  var shrink = compact ? 0.93 : 1;
   function bwFor(R) {
     var cols = Math.ceil(nL / R);
     var perSide = cols + (cols + 1) * GX;
     var bwW = (W - (tall ? 18 : 10)) / (2 * perSide + (tall ? TALL_SPAN : 0));
-    var bwH = (roomH - (R - 1) * rowGap) / (R * BOTTLE_H);
-    return Math.min(bwW, bwH, 78);
+    var bwH = (roomH - (R - 1) * rowGap) / (R * ratio);
+    return Math.min(bwW * shrink, bwH * shrink, 78);
   }
-  var pref = game.cfg ? game.cfg.tiers : 3;
   var prefBw = bwFor(pref);
   if (prefBw >= MIN_BW + 1) return { tiers: pref, bw: prefBw, rowGap: rowGap };
   /* 아주 납작한 화면(가로 모드 등)에서는 단 수를 늘리거나 줄여 크기를 지킨다 */
@@ -1065,7 +1104,41 @@ function planTiers(nL, W, H, tall, badgeH) {
   return best;
 }
 
+/* 병 폭·가운데 긴 병 길이를 화면에 반영 */
+function applyBottleSize(bw, tall, badgeH, H) {
+  stageEl.style.setProperty('--bw', bw.toFixed(2) + 'px');
+  if (!tall) { stageEl.style.removeProperty('--tall-slot'); return; }
+  var sideH = Math.max(colLeft.getBoundingClientRect().height, colRight.getBoundingClientRect().height);
+  var tallB = null;
+  game.bottles.forEach(function (b) { if (b.tall) tallB = b; });
+  var cap = tallB ? tallB.cap : 8;
+  var slot = (sideH - badgeH - bw * 0.42) / cap;
+  /* 무대 높이를 넘지 않게 한 번 더 제한 (가로 모드처럼 세로가 아주 좁은 화면) */
+  var maxSlot = H ? (H - badgeH - bw * 0.66) / cap : 1e9;
+  slot = Math.min(maxSlot, Math.max(bw * 0.42, Math.min(bw * 1.20, slot)));
+  stageEl.style.setProperty('--tall-slot', slot.toFixed(2) + 'px');
+}
+
+/* 지금 그려진 선반들이 실제로 차지하는 세로 길이 (실측) */
+function columnHeight() {
+  return Math.max(
+    colLeft.getBoundingClientRect().height,
+    colRight.getBoundingClientRect().height,
+    colCenter.getBoundingClientRect().height
+  );
+}
+
 function fitStage(force) {
+  if (!appEl || !barEl) return;
+
+  /* 1) 화면에서 실제로 쓸 수 있는 높이를 구해 무대 높이를 px 로 못 박는다 (넘침 원천 차단) */
+  var metrics = stageMetrics();
+  var avail = metrics.avail;
+  stageEl.style.flex = '0 0 auto';
+  stageEl.style.height = avail.toFixed(1) + 'px';
+  stageEl.style.maxHeight = avail.toFixed(1) + 'px';
+  stageEl.style.setProperty('--stage-h', avail.toFixed(1) + 'px');
+
   var W = stageEl.clientWidth, H = stageEl.clientHeight;
   if (!W || !H) return;
 
@@ -1091,23 +1164,19 @@ function fitStage(force) {
     badgeEl = stageEl.querySelector('.goal-badge');
     badgeH = badgeEl ? badgeEl.offsetHeight + 8 : (tall ? 24 : 0);
     plan = planTiers(nL, W, H, tall, badgeH);
+    stageEl.style.setProperty('--rowgap', plan.rowGap.toFixed(1) + 'px');
   }
 
+  /* 2) 계산값을 적용한 뒤, 실제 그려진 높이를 재서 화면을 넘으면 병을 더 줄인다 */
   var bw = Math.max(MIN_BW, Math.min(plan.bw, 78));
-  stageEl.style.setProperty('--bw', bw.toFixed(2) + 'px');
-
-  /* 가운데 긴 병은 좌우 선반 전체 높이에 맞춰 길게 */
-  if (tall) {
-    var sideH = Math.max(colLeft.getBoundingClientRect().height, colRight.getBoundingClientRect().height);
-    var tallB = null;
-    game.bottles.forEach(function (b) { if (b.tall) tallB = b; });
-    var cap = tallB ? tallB.cap : 8;
-    var slot = (sideH - badgeH - bw * 0.42) / cap;
-    slot = Math.max(bw * 0.55, Math.min(bw * 1.20, slot));
-    stageEl.style.setProperty('--tall-slot', slot.toFixed(2) + 'px');
-  } else {
-    stageEl.style.removeProperty('--tall-slot');
+  applyBottleSize(bw, tall, badgeH, H);
+  for (var i = 0; i < 4; i++) {
+    var drawn = columnHeight();
+    if (drawn <= H - 1 || bw <= MIN_BW) break;
+    bw = Math.max(MIN_BW, bw * ((H - 1) / drawn) * 0.995);
+    applyBottleSize(bw, tall, badgeH, H);
   }
+
   game.bottles.forEach(function (b) { b.restRect = null; });
 }
 
@@ -1501,6 +1570,11 @@ function onResize() {
 }
 window.addEventListener('resize', onResize);
 window.addEventListener('orientationchange', onResize);
+/* iOS Safari 는 스크롤·툴바 접힘에 따라 visualViewport 가 따로 변한다 */
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', onResize);
+  window.visualViewport.addEventListener('scroll', onResize);
+}
 
 (function init() {
   btnSound.classList.toggle('muted', Sound.isMuted());
