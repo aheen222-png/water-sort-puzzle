@@ -219,6 +219,7 @@ body{
   box-shadow:0 0 7px var(--c);
 }
 .goal-badge b{ color:#fff; font-weight:800; }
+.goal-badge .goal-count{ font-size:10px; font-weight:800; color:rgba(255,255,255,.72); letter-spacing:.2px; }
 
 .bottle.done .body{
   box-shadow:
@@ -378,26 +379,34 @@ function mulberry32(seed) {
   };
 }
 
-/* 레벨 설계: 레벨이 오르면 색이 늘고, 3레벨부터 가운데 긴 병이 등장 */
+/* 레벨 설계
+   · 1~2레벨: 일반 병만
+   · 3레벨부터: 가운데 '목표 병'(용량 8칸)이 등장.
+     목표 병은 시작할 때 언제나 0칸이고, 어떤 색을 채워야 하는지만 뱃지·링으로 알려준다.
+     목표 색 8칸은 일반 병들에 섞여 있고, 일반 병 수는
+     '일반 색 수 + 목표 색 몫 2병 + 여유 빈 병 2병'으로 넉넉히 잡는다. */
 function levelConfig(level) {
-  var colors = Math.max(4, Math.min(COLORS.length, 3 + level));   // L1 4색 → L5 8색
   var tall = level >= 3;
-  var empties = tall ? 3 : 2;
-  var depth = Math.min(72, 14 + (level - 1) * 7);                 // 뒤섞는 횟수
-  return { colors: colors, tall: tall, empties: empties, depth: depth, level: level };
+  var normalColors = tall ? Math.min(6, level + 1) : Math.min(5, level + 3);   // 일반 색 수
+  var colors = normalColors + (tall ? 1 : 0);                                  // 목표 색 포함
+  var depth = Math.min(96, 18 + (level - 1) * 8);                              // 뒤섞는 횟수
+  return { colors: colors, normalColors: normalColors, tall: tall, empties: 2, depth: depth, level: level };
 }
 
-/* 완성 상태에서 출발하는 병들
-   - 긴 병이 있는 레벨: 목표 색 하나가 '긴 병 전담'(8칸). 그 색의 일반 병은 만들지 않는다. */
+/* 완성 상태에서 출발하는 병들 (역연산 섞기의 출발점)
+   - 긴 병이 있는 레벨: 목표 색 하나가 '긴 병 전담'(8칸). 그 색의 일반 병은 만들지 않는다.
+     목표 색 8칸이 들어갈 병 2개 + 여유 빈 병 2개를 더 두어 일반 병 수를 넉넉히 잡는다
+     (예: 일반 색 4종 + 목표 색 → 일반 병 8개 = 채워진 6개 + 빈 2개, 가운데 빈 긴 병 1개). */
 function makeBottles(cfg, goal) {
   var out = [], c, e;
   var hasGoal = (goal !== null && goal !== undefined);
+  var goalSlots = cfg.tall ? 2 : 0;              // 목표 색 8칸이 차지할 병 수
   for (c = 0; c < cfg.colors; c++) {
     if (hasGoal && c === goal) continue;          // 목표 색은 긴 병이 전담
-    out.push({ cells: new Array(4).fill(c), cap: 4, tall: false, goal: null });
+    out.push({ cells: new Array(4).fill(c), cap: 4, tall: false, goal: null, levelGoal: hasGoal ? goal : null });
   }
-  for (e = 0; e < cfg.empties; e++) out.push({ cells: [], cap: 4, tall: false, goal: null });
-  if (cfg.tall) out.push({ cells: new Array(8).fill(goal), cap: 8, tall: true, goal: goal });
+  for (e = 0; e < cfg.empties + goalSlots; e++) out.push({ cells: [], cap: 4, tall: false, goal: null, levelGoal: hasGoal ? goal : null });
+  if (cfg.tall) out.push({ cells: new Array(8).fill(goal), cap: 8, tall: true, goal: goal, levelGoal: goal });
   return out;
 }
 
@@ -431,11 +440,17 @@ function applyPour(state, ai, bi) {
   return n;
 }
 
+/* 완성 판정
+   · 일반 병: 네 칸이 모두 같은 색. 단 목표 색은 가운데 긴 병에서만 완성되므로,
+     일반 병에 가득 찬 목표 색은 '완성'이 아니다 — 뚜껑이 닫히지 않고 긴 병으로 부을 수 있다.
+   · 가운데 긴 병: 목표 색 8칸일 때만 완성. */
 function isComplete(bottle) {
-  var cells = bottle.cells;
+  var cells = bottle.cells, i;
   if (cells.length !== bottle.cap) return false;
-  for (var i = 1; i < cells.length; i++) if (cells[i] !== cells[0]) return false;
-  if (bottle.goal !== null && bottle.goal !== undefined && cells[0] !== bottle.goal) return false;
+  for (i = 1; i < cells.length; i++) if (cells[i] !== cells[0]) return false;
+  if (bottle.tall) return cells[0] === bottle.goal;
+  var g = bottle.levelGoal;
+  if (g !== null && g !== undefined && cells[0] === g) return false;
   return true;
 }
 
@@ -485,60 +500,102 @@ function splitColors(state) {
 /* ---------------------------------------------------------------
    역방향 섞기: 실제 "붓기"의 정확한 역연산만 사용하므로
    만들어진 판은 항상 풀 수 있다. (되돌리면 곧 정답 순서)
-   역연산: 완성 상태에서 색 c를 B에서 A로 k칸 옮기되,
+   역연산: 지금 상태의 B 맨 위 c색 k칸을 A로 옮긴다.
+           정방향에서는 A→B로 k칸을 붓는 수가 된다.
            A는 비었거나 맨 위 색이 c가 아니어야 한다.
+   · 긴 병은 받는 쪽으로도 절대 쓰지 않는다 → 시작 0칸이 섞는 내내 유지된다.
+   · 빈 병을 한 번에 가득 채우는 역연산은 만들지 않는다
+     (정방향에서 '뚜껑 닫힌 병에서 붓는 수'가 되어 막힌다).
    --------------------------------------------------------------- */
-function scramble(state, depth, rng, minTall) {
-  if (minTall === undefined) minTall = 3;
-  var moves = [], lastFrom = -1, lastTo = -1, step, bi, ai;
-
-  for (step = 0; step < depth; step++) {
-    var cands = [], total = 0;
-
-    for (bi = 0; bi < state.length; bi++) {
-      var B = state[bi];
-      var tr = topRun(B.cells);
-      if (!tr.n) continue;                                          // 옮길 액체가 없음
-
-      for (ai = 0; ai < state.length; ai++) {
-        if (ai === bi) continue;
-        var A = state[ai];
-        /* 정방향 A→B로 되돌릴 수 있어야 한다. B가 긴 병이면 목표 색만 받는다. */
-        if (B.tall && tr.color !== B.goal) continue;
-        if (A.tall) continue;                                   // 정방향으로 긴 병에서 붓는 수 금지
-        var aFree = A.cap - A.cells.length;
-        if (aFree < 1) continue;
-        var aLen = A.cells.length;
-        if (aLen && A.cells[aLen - 1] === tr.color) continue;      // 역연산 조건
-        if (bi === lastTo && ai === lastFrom) continue;            // 방금 한 수 되돌리기 금지
-        var maxK = Math.min(tr.n, aFree);
-        for (var k = 1; k <= maxK; k++) {
-          /* A가 통째로 같은 색으로 차버리면(완성) 정방향으로 되돌릴 때
-             뚜껑 닫힌 병에서 붓는 수가 되므로 만들지 않는다 */
-          if (!A.cells.length && k === A.cap) continue;
-          if (B.tall && B.cells.length - k < minTall) continue;  // 긴 병에 목표 색은 minTall칸 이상 남긴다
-          /* 되돌린 뒤 B에 남는 맨 위가 같은 색이거나, B가 통째로 비어야
-             정방향으로 다시 부을 수 있다 */
-          if (k === tr.n && B.cells.length > k) continue;
-          var w = k * k;                                           // 큰 이동을 선호
-          cands.push({ b: bi, a: ai, k: k, w: w });
-          total += w;
-        }
+function reverseCandidates(state, skipB, skipA, smallFirst) {
+  var out = [], bi, ai, B, A, tr, free, len, maxK, k;
+  for (bi = 0; bi < state.length; bi++) {
+    if (bi === skipB) continue;
+    B = state[bi];
+    if (!B.cells.length) continue;                                  // 옮길 액체가 없음
+    tr = topRun(B.cells);
+    if (B.tall && tr.color !== B.goal) continue;
+    for (ai = 0; ai < state.length; ai++) {
+      if (ai === bi || ai === skipA) continue;
+      A = state[ai];
+      if (A.tall) continue;                                         // 긴 병은 받기 전용
+      free = A.cap - A.cells.length;
+      if (free < 1) continue;
+      len = A.cells.length;
+      if (len && A.cells[len - 1] === tr.color) continue;           // 역연산 조건
+      maxK = Math.min(tr.n, free);
+      if (!len && maxK >= A.cap) maxK = A.cap - 1;                  // 빈 병 통째 채우기 금지
+      for (k = 1; k <= maxK; k++) {
+        /* k가 맨 위 덩어리 전체인데 B에 다른 색이 남으면,
+           정방향에서 A→B가 막힌다(맨 위 색 불일치) */
+        if (k === tr.n && B.cells.length > k) continue;
+        out.push({ b: bi, a: ai, k: k, w: smallFirst ? 1 / (k * k) : k * k });
       }
     }
-    if (!cands.length) break;
+  }
+  return out;
+}
 
-    var r = rng() * total, pick = cands[cands.length - 1], acc = 0;
-    for (var ci = 0; ci < cands.length; ci++) {
-      acc += cands[ci].w;
-      if (r <= acc) { pick = cands[ci]; break; }
+function applyReverse(state, m, moves) {
+  var color = state[m.b].cells[state[m.b].cells.length - 1], i;
+  for (i = 0; i < m.k; i++) state[m.b].cells.pop();
+  for (i = 0; i < m.k; i++) state[m.a].cells.push(color);
+  if (moves) moves.push([m.b, m.a, m.k]);
+}
+
+function pickWeighted(cands, rng) {
+  var total = 0, acc = 0, i;
+  for (i = 0; i < cands.length; i++) total += cands[i].w;
+  var r = rng() * total;
+  for (i = 0; i < cands.length; i++) { acc += cands[i].w; if (r <= acc) return cands[i]; }
+  return cands[cands.length - 1];
+}
+
+/* 가운데 긴 병을 0칸으로: 목표 색을 전부 일반 병으로 옮긴다.
+   받을 자리가 없으면 일반 병끼리 한 수 옮겨 자리를 만든다. */
+function drainTall(state, tallIdx, moves, rng, budget) {
+  var guard = 0, cands, open, ai, A, free, len, maxK, k, n, c;
+  while (state[tallIdx].cells.length) {
+    if (guard++ > budget) return false;
+    cands = [];
+    n = state[tallIdx].cells.length;
+    c = state[tallIdx].cells[n - 1];
+    for (ai = 0; ai < state.length; ai++) {
+      if (ai === tallIdx) continue;
+      A = state[ai];
+      free = A.cap - A.cells.length;
+      if (free < 1) continue;
+      len = A.cells.length;
+      if (len && A.cells[len - 1] === c) continue;
+      maxK = Math.min(n, free);
+      if (!len && maxK >= A.cap) maxK = A.cap - 1;
+      for (k = 1; k <= maxK; k++) cands.push({ b: tallIdx, a: ai, k: k, w: k * k });
     }
+    if (cands.length) { applyReverse(state, pickWeighted(cands, rng), moves); continue; }
+    open = reverseCandidates(state, tallIdx, tallIdx, true);      // 긴 병은 주고받지 않는다
+    if (!open.length) return false;
+    applyReverse(state, pickWeighted(open, rng), moves);
+  }
+  return true;
+}
 
-    var color = state[pick.b].cells[state[pick.b].cells.length - 1];
-    for (var m = 0; m < pick.k; m++) state[pick.b].cells.pop();
-    for (var n = 0; n < pick.k; n++) state[pick.a].cells.push(color);
+/* 판 섞기: 1) 긴 병을 완전히 비운다 2) 일반 병들만 역연산으로 섞는다 */
+function scramble(state, depth, rng) {
+  var moves = [], lastFrom = -1, lastTo = -1, step, i, tallIdx = -1, pick, cands, list;
+  for (i = 0; i < state.length; i++) if (state[i].tall) { tallIdx = i; break; }
 
-    moves.push([pick.b, pick.a, pick.k]);
+  if (tallIdx >= 0 && !drainTall(state, tallIdx, moves, rng, depth * 8 + 80)) return null;
+
+  for (step = 0; step < depth; step++) {
+    cands = reverseCandidates(state, tallIdx, tallIdx);
+    list = [];
+    for (i = 0; i < cands.length; i++) {
+      if (cands[i].b === lastTo && cands[i].a === lastFrom) continue;   // 방금 수 되돌리기 금지
+      list.push(cands[i]);
+    }
+    if (!list.length) break;
+    pick = pickWeighted(list, rng);
+    applyReverse(state, pick, moves);
     lastFrom = pick.b; lastTo = pick.a;
   }
   return moves;
@@ -547,27 +604,32 @@ function scramble(state, depth, rng, minTall) {
 /* 레벨 생성 (항상 풀 수 있는 판) */
 function generateLevel(level, seed) {
   var cfg = levelConfig(level);
-  var best = null;
+  var best = null, bestScore = -Infinity, round, attempt;
 
-  for (var attempt = 0; attempt < 40; attempt++) {
-    var rng = mulberry32((seed + Math.imul(attempt, 2654435761)) >>> 0);
-    var goal = cfg.tall ? Math.floor(rng() * cfg.colors) : null;   // 가운데 긴 병의 목표 색
-    var minTall = cfg.tall ? 3 + Math.floor(rng() * 4) : 3;   // 긴 병 시작 칸수 3~6 (판마다 다르게)
-    var state = makeBottles(cfg, goal);
-    var moves = scramble(state, cfg.depth, rng, minTall);
-    var split = splitColors(state);
-    var done = countSettled(state);
-    var score = split * 100 + moves.length - done * 10;
+  for (round = 0; round < 3; round++) {
+    for (attempt = 0; attempt < 60; attempt++) {
+      var rng = mulberry32((seed + round * 7919 + Math.imul(attempt, 2654435761)) >>> 0);
+      var goal = cfg.tall ? Math.floor(rng() * cfg.colors) : null;   // 가운데 긴 병의 목표 색
+      var state = makeBottles(cfg, goal);
+      var moves = scramble(state, cfg.depth, rng);
+      if (!moves) continue;                                          // 긴 병을 다 비우지 못한 시도는 버린다
 
-    var result = { bottles: state, cfg: cfg, goal: goal, moves: moves, attempt: attempt, split: split };
+      var tallLen = -1, empties = 0, i;
+      for (i = 0; i < state.length; i++) {
+        if (state[i].tall) tallLen = state[i].cells.length;
+        else if (!state[i].cells.length) empties++;
+      }
+      if (cfg.tall && tallLen !== 0) continue;                       // 가운데 병은 반드시 0칸으로 시작
+      if (isWin(state)) continue;                                    // 이미 완성된 판은 버린다
 
-    var tallOk = true, empties = 0;
-    for (var bi2 = 0; bi2 < state.length; bi2++) {
-      if (state[bi2].tall) tallOk = state[bi2].cells.length >= 3 && state[bi2].cells.length <= 6;
-      else if (!state[bi2].cells.length) empties++;
+      var split = splitColors(state);
+      var done = countSettled(state);
+      var score = split * 100 + moves.length - done * 10 + empties * 3;   // 빈 병이 하나라도 있는 판을 살짝 선호
+      var result = { bottles: state, cfg: cfg, goal: goal, moves: moves, attempt: attempt, split: split, score: score };
+      if (split >= cfg.colors) return result;
+      if (score > bestScore) { bestScore = score; best = result; }
     }
-    if (!isWin(state) && split >= cfg.colors && tallOk && empties >= 1) return result;
-    if (!best || score > best.score) { result.score = score; best = result; }
+    if (best) break;
   }
   return best;
 }
@@ -787,14 +849,17 @@ function buildLayout() {
     });
   });
 
+  game.goalCountEl = null;
   if (tall) {
     var wrap = document.createElement('div');
     wrap.className = 'goal-wrap';
 
     var badge = document.createElement('div');
     badge.className = 'goal-badge';
-    badge.innerHTML = '<i></i>목표 <b>' + COLOR_NAMES[tall.goal] + '</b>';
+    badge.innerHTML = '<i></i>목표 <b>' + COLOR_NAMES[tall.goal] + '</b>' +
+                      '<span class="goal-count" id="goalCount">0/8</span>';
     badge.querySelector('i').style.setProperty('--c', COLORS[tall.goal]);
+    game.goalCountEl = badge.querySelector('#goalCount');
 
     var tel = makeBottleEl(tall);
     tel.classList.add('goal');
@@ -812,6 +877,12 @@ function updateHud() {
   elDone.textContent = String(countSettled(game.bottles));
   elTotal.textContent = String(game.cfg ? game.cfg.colors : 0);
   $('#btnUndo').style.opacity = game.history.length ? '1' : '.45';
+  /* 가운데 목표 병 진행도 (0/8 → 8/8) */
+  if (game.goalCountEl) {
+    var tall = null;
+    game.bottles.forEach(function (b) { if (b.tall) tall = b; });
+    game.goalCountEl.textContent = (tall ? tall.cells.length : 0) + '/' + (tall ? tall.cap : 8);
+  }
 }
 
 /* 화면에 맞춰 병 크기 자동 조절 (아이폰 세로 ~ 데스크톱) */
@@ -1040,8 +1111,11 @@ function doPour(fromId, toId, amount) {
 
   if (isWin(game.bottles)) { onWin(); return; }
   if (isComplete(to)) {
-    setStatus(to.tall ? '가운데 긴 병에 ' + COLOR_NAMES[to.goal] + ' 8칸을 다 모았어요!'
+    setStatus(to.tall ? '가운데 병에 ' + COLOR_NAMES[to.goal] + ' 8칸을 다 모았어요!'
                       : '한 병 완성 — 뚜껑을 닫았어요');
+  } else if (to.tall) {
+    setStatus('가운데 병에 ' + COLOR_NAMES[to.goal] + ' ' + to.cells.length + '/' + to.cap + '칸 — ' +
+              (to.cap - to.cells.length) + '칸 남았어요');
   }
 }
 
@@ -1163,7 +1237,7 @@ function startLevel(level, seed) {
   var goalBottle = null;
   game.bottles.forEach(function (b) { if (b.tall) goalBottle = b; });
   setStatus(goalBottle
-    ? '가운데 긴 병엔 ' + COLOR_NAMES[goalBottle.goal] + '만 — ' + COLOR_NAMES[goalBottle.goal] + ' 8칸을 모으면 클리어'
+    ? '가운데 병은 비어 있어요 — ' + COLOR_NAMES[goalBottle.goal] + ' 8칸을 모아 채우면 클리어'
     : '병을 눌러 고른 뒤, 다른 병을 눌러 부으세요');
 
   window.scrollTo(0, 0);
@@ -1260,7 +1334,7 @@ window.__wsp = {
       pouring: game.bottles.filter(function (b) { return !!b.animT1 || !!b.animT2; }).length,
       tilted: game.bottles.filter(function (b) { return b.el && (b.el.classList.contains('pouring') || b.el.classList.contains('return')); }).length,
       goal: game.goal,
-      bottles: game.bottles.map(function (b) { return { cells: b.cells.slice(), cap: b.cap, tall: b.tall, goal: b.goal }; }),
+      bottles: game.bottles.map(function (b) { return { id: b.id, cells: b.cells.slice(), cap: b.cap, tall: b.tall, goal: b.goal, done: isComplete(b) }; }),
       win: isWin(game.bottles)
     };
   },
@@ -1268,12 +1342,24 @@ window.__wsp = {
   selfTest: function (levels, seeds) {
     levels = levels || 12; seeds = seeds || 30;
     var report = [], allOk = true, minMoves = Infinity, maxMoves = 0, fails = [];
+    var tallZeroFail = 0, emptyBottleStat = [], bottleStat = [];
     for (var L = 1; L <= levels; L++) {
       for (var s = 1; s <= seeds; s++) {
         var seed = s * 7919 + L * 104729;
         var g = generateLevel(L, seed);
-        var st = g.bottles.map(function (b) { return { cells: b.cells.slice(), cap: b.cap, tall: b.tall, goal: b.goal }; });
+        var st = g.bottles.map(function (b) { return { cells: b.cells.slice(), cap: b.cap, tall: b.tall, goal: b.goal, levelGoal: b.levelGoal }; });
         var alreadyWon = isWin(st);
+
+        /* 시작 상태 검사: 긴 병은 0칸, 목표 색은 정확히 8칸이 일반 병들에 */
+        var tallStart = -1, goalCells = 0, emptyBottles = 0, i2;
+        for (i2 = 0; i2 < st.length; i2++) {
+          if (st[i2].tall) tallStart = st[i2].cells.length;
+          else if (!st[i2].cells.length) emptyBottles++;
+          for (var j2 = 0; j2 < st[i2].cells.length; j2++) if (st[i2].cells[j2] === g.goal) goalCells++;
+        }
+        var startOk = !g.cfg.tall || (tallStart === 0 && goalCells === 8);
+        if (!startOk) tallZeroFail++;
+
         var replayOk = true, steps = 0, lockViolation = false;
         for (var i = g.moves.length - 1; i >= 0; i--) {
           var mv = g.moves[i];
@@ -1283,26 +1369,28 @@ window.__wsp = {
           steps++;
         }
         var solved = isWin(st);
-        /* 긴 병이 있으면 목표 색 8칸으로 가득 찼는지, 총 8칸이 판에 있는지 */
+        /* 다 푼 뒤 모습: 긴 병은 목표 색 8칸, 일반 병은 4칸씩으로 정리되는가 */
         var goalOk = true;
         if (g.cfg.tall) {
-          var tall = null, i2;
-          for (i2 = 0; i2 < g.bottles.length; i2++) if (g.bottles[i2].tall) tall = g.bottles[i2];
-          goalOk = !!tall && tall.goal === g.goal;
-          var cnt = 0;
-          for (i2 = 0; i2 < st.length; i2++) for (var j = 0; j < st[i2].cells.length; j++) if (st[i2].cells[j] === g.goal) cnt++;
-          if (cnt !== 8) goalOk = false;
+          var tall = null;
+          for (i2 = 0; i2 < st.length; i2++) if (st[i2].tall) tall = st[i2];
+          goalOk = !!tall && tall.goal === g.goal && tall.cells.length === 8;
+          for (i2 = 0; i2 < tall.cells.length; i2++) if (tall.cells[i2] !== g.goal) goalOk = false;
         }
-        var ok = replayOk && solved && !alreadyWon && !lockViolation && goalOk;
-        if (!ok) { allOk = false; if (fails.length < 6) fails.push({ level: L, seed: seed, replay: replayOk, solved: solved, won: alreadyWon, lock: lockViolation, goal: goalOk }); }
+        var ok = replayOk && solved && !alreadyWon && !lockViolation && goalOk && startOk;
+        if (!ok) { allOk = false; if (fails.length < 6) fails.push({ level: L, seed: seed, replay: replayOk, solved: solved, won: alreadyWon, lock: lockViolation, goal: goalOk, start: startOk }); }
         if (steps < minMoves) minMoves = steps;
         if (steps > maxMoves) maxMoves = steps;
+        emptyBottleStat.push(emptyBottles);
+        bottleStat.push(g.bottles.length);
         if (L <= 3 && s <= 3) {
-          report.push({ level: L, seed: seed, bottles: g.bottles.length, colors: g.cfg.colors, tall: g.cfg.tall, goal: g.goal, scramble: g.moves.length, replay: steps, ok: ok });
+          report.push({ level: L, seed: seed, bottles: g.bottles.length, colors: g.cfg.colors, tall: g.cfg.tall, goal: g.goal, tallStart: tallStart, empty: emptyBottles, scramble: g.moves.length, replay: steps, ok: ok });
         }
       }
     }
-    return { allOk: allOk, minMoves: minMoves, maxMoves: maxMoves, fails: fails, samples: report };
+    function avg(a) { var t = 0, i; for (i = 0; i < a.length; i++) t += a[i]; return a.length ? t / a.length : 0; }
+    return { allOk: allOk, minMoves: minMoves, maxMoves: maxMoves, fails: fails, samples: report,
+             tallZeroFail: tallZeroFail, avgEmpty: avg(emptyBottleStat), avgBottles: avg(bottleStat), cases: bottleStat.length };
   }
 };
 </script>
