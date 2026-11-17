@@ -2485,7 +2485,7 @@ var Room = (function () {
       case 'hat_glasses': return artGlasses();
       case 'hat_crown': return artHatCrown(u);
 
-      case 'outfit_none': return '';
+      case 'outfit_none': return artOutfitNone();
       case 'outfit_rag': return artRag();
       case 'outfit_tee': return artTee(u);
       case 'outfit_tux': return artTux();
@@ -2584,6 +2584,12 @@ var Room = (function () {
 
   /* ---------- 반려동물 의상 ----------
      앉은 몸에 감기는 핏으로 그린다: (50,0)이 목 중앙, 어깨 곡선을 따라 내려오고 밑단은 둥글게. */
+  function artOutfitNone() {
+    return '<g opacity=".45">' +
+      '<path d="M30 24q20-12 40 0l6 12q3 14 .5 28Q50 74 24 64q-2-14 .5-28z" fill="none" stroke="#9fb0da" stroke-width="2" stroke-dasharray="5 6"/>' +
+      '<path d="M30 24q20-12 40 0" fill="none" stroke="#9fb0da" stroke-width="2" stroke-dasharray="5 6"/>' +
+      '</g>';
+  }
   function artRag() {
     return '<g>' +
       '<path d="M28 1Q50-8 72 1l6 10q3 15 1 27l-7-4-5 9-6-8-6 10-6-10-6 8-5-9-7 4q-2-12 1-27z" fill="#8B7355"/>' +
