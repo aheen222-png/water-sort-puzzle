@@ -9,7 +9,10 @@
 /* ================= 기본 ================= */
 :root{
   /* 병 폭: 화면 폭/높이 중 작은 쪽에 맞춰 자동 조절 (아이폰 세로 ~ 데스크톱) */
-  --bw: clamp(34px, min(12.4vw, 6.1vh), 68px);
+  --bw: clamp(26px, min(11vw, 5.2vh), 62px);
+  /* 아이폰 Safari 하단 floating 툴바가 덮는 영역 — 선반은 이 위에서 멈춘다
+     (노치 기기에서는 safe-area-inset-bottom 이 더해져 약 120px 비워 둔다) */
+  --bottom-hold: calc(env(safe-area-inset-bottom, 0px) + 86px);
 }
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body{ margin:0; height:100%; }
@@ -21,7 +24,8 @@ body{
 #app{
   position:relative; display:flex; flex-direction:column;
   height:100vh; height:100dvh;
-  padding:max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  /* 아래쪽은 Safari 하단 툴바 자리로 통째로 비워 둔다 (선반·버튼이 겹치지 않게) */
+  padding:max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) var(--bottom-hold) max(6px, env(safe-area-inset-left));
   background:
     radial-gradient(105% 62% at 50% -8%, rgba(96,116,255,.36), rgba(96,116,255,0) 72%),
     radial-gradient(75% 55% at 50% 108%, rgba(128,64,224,.28), rgba(128,64,224,0) 72%),
@@ -260,14 +264,21 @@ body{
   0%{ transform:scale(.3); opacity:.9 } 100%{ transform:scale(1.7); opacity:0 }
 }
 
-/* ================= 하단 ================= */
-.foot{ position:relative; z-index:12; flex:0 0 auto; padding:2px 6px 4px; text-align:center; }
+/* ============ 보조 줄 (상태 문구 + 다시하기/새 판) — 무대 위, HUD 아래 ============ */
+.bar{
+  position:relative; z-index:12; flex:0 0 auto;
+  display:flex; flex-direction:column; align-items:center; gap:5px;
+  padding:4px 4px 0;
+}
 .status{
-  margin:0 0 6px; font-size:11.5px; line-height:1.35; color:rgba(214,226,255,.66);
-  height:16px; overflow:hidden; letter-spacing:-.2px;
+  margin:0; width:100%; text-align:center;
+  font-size:11.5px; line-height:16px; height:16px;
+  color:rgba(214,226,255,.66); letter-spacing:-.2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   transition:opacity .2s ease;
 }
-.foot-btns{ display:flex; gap:8px; justify-content:center; }
+.bar-btns{ display:flex; gap:8px; justify-content:center; }
+.pill.sm{ padding:5px 13px; font-size:11.5px; font-weight:650; }
 
 /* ================= 클리어 ================= */
 .overlay{
@@ -301,8 +312,10 @@ body{
 
 /* ================= 반응형 보정 ================= */
 @media (max-height:640px){
-  .status{ height:14px; font-size:10.5px; margin-bottom:4px; }
+  .bar{ gap:4px; }
+  .status{ height:14px; line-height:14px; font-size:10.5px; }
   .pill{ padding:6px 9px; font-size:11.5px; }
+  .pill.sm{ padding:5px 11px; font-size:11px; }
 }
 @media (prefers-reduced-motion:reduce){
   .bottle,.band,.tick,.card,.card .emoji{ transition-duration:.08s !important; animation:none !important; }
@@ -329,19 +342,19 @@ body{
     <button class="pill" id="btnUndo">되돌리기</button>
   </header>
 
+  <div class="bar">
+    <p class="status" id="status">병을 눌러 고른 뒤, 다른 병을 눌러 부으세요</p>
+    <div class="bar-btns">
+      <button class="pill sm" id="btnRestart">다시하기</button>
+      <button class="pill sm" id="btnNew">새 판</button>
+    </div>
+  </div>
+
   <main class="stage" id="stage">
     <div class="col left" id="colLeft"></div>
     <div class="col center" id="colCenter"></div>
     <div class="col right" id="colRight"></div>
   </main>
-
-  <footer class="foot">
-    <p class="status" id="status">병을 눌러 고른 뒤, 다른 병을 눌러 부으세요</p>
-    <div class="foot-btns">
-      <button class="pill" id="btnRestart">다시하기</button>
-      <button class="pill" id="btnNew">새 판</button>
-    </div>
-  </footer>
 
   <div class="stream-layer" id="streamLayer"></div>
 
@@ -380,54 +393,62 @@ function mulberry32(seed) {
   };
 }
 
-/* 레벨 설계 (색은 샘플과 같은 6색 고정 — 병 개수와 선반 단 수로만 난이도를 올린다)
-   · 1~2레벨: 일반 병만 (긴 병 없음)
-   · 3레벨 부터: 가운데 '목표 병'이 등장. 시작은 언제나 0칸이고,
-     목표 색 8·12·16칸이 일반 병들에 나뉘어 있다. 두 병씩 부어 긴 병을 채우면 완성이다.
-   · 레벨이 오르면 같은 색을 여러 일반 병(3~4병 = 12~16칸)에 나눠 담아 병 수를 늘린다.
-       1~2  : 일반 6~7병 (1단)
-       3~4  : 일반 8~9병 + 가운데 8칸 (2단 선반)
-       5~6  : 일반 14병 + 가운데 8칸  (3단 선반)
-       7~9  : 일반 16병 + 가운데 12칸
-       10~12: 일반 20병 + 가운데 12칸 (4단 선반)
-       13~15: 일반 21병 + 가운데 12칸
-       16~19: 일반 22병 + 가운데 12칸
-       20+  : 일반 23병 + 가운데 16칸 (샘플과 같은 최대 배치)
-     색 하나가 3~4병이어도 일반 병 하나가 그 색 4칸으로 차면 뚜껑이 닫혀 완성되고,
-     나머지 칸은 다른 일반 병에서 채워 완성된다. (목표 색만 가운데 긴 병 전용) */
+/* 레벨 설계 (색은 샘플과 같은 6색 고정 — 병 개수와 선반 배치로만 난이도를 올린다)
+   · 좌우 선반은 언제나 같은 병 수로 놓는다(좌우 대칭) — 좌우 각 T단 × 한 단에 S병 = 일반 병 2×T×S개
+   · 가운데 긴 병은 3레벨부터 1개 (0칸에서 시작, 목표 색만 받는다)
+   · 3레벨부터는 시작할 때 텅 빈 일반 병이 하나도 없다.
+     액체는 4칸 단위라 선반 병 수가 딱 맞고, 남는 병 2개 몫(8칸)이 섞기용 여유가 된다 →
+     시작할 때는 그 8칸이 여러 일반 병의 윗칸에 1~3칸씩 나뉘어 있다.
+     배치표 (T×S · 일반병 · 가운데 · 일반 색 수 · 색별 병 수)
+         1 : 1×3   6     -      4  1,1,1,1
+         2 : 1×4   8     -      6  1,1,1,1,1,1
+         3 : 2×2   8    8칸     4  1,1,1,1
+         4 : 2×3  12    8칸     5  2,2,2,1,1
+         5 : 3×2  12    8칸     5  2,2,2,1,1
+         6 : 3×3  18    8칸     5  3,3,3,3,2
+         7 : 3×3  18   12칸     5  3,3,3,2,2
+         8 : 3×4  24   12칸     5  4,4,4,4,3
+         9 : 4×3  24   12칸     5  4,4,4,4,3
+      10~12 : 4×3  24   16칸     5  4,4,4,3,3
+      13~15 : 4×3  24   12칸     5  5,4,4,3,3
+      16~19 : 4×3  24   16칸     5  5,4,3,3,3
+      20~24 : 4×3  24   16칸     5  6,3,3,3,3
+      25~29 : 4×3  24   16칸     5  6,4,3,3,2
+      30+   : 4×3  24   16칸     5  7,3,3,3,2
+   · 20레벨 이상은 좌 12병(4단×3병) + 우 12병 + 가운데 1병 = 25병으로 꽉 찬 최대 배치. */
 function levelConfig(level) {
-  var tall = level >= 3;
-  var counts, tallCap, tiers;
-  if (!tall) {                                   // 1~2레벨: 일반 병만
-    counts = level <= 1 ? [1, 1, 1, 1] : [1, 1, 1, 1, 1];
-    tallCap = 0; tiers = 1;
-  } else if (level <= 4) {                       // 3~4레벨: 좌우 2단
-    counts = level <= 3 ? [1, 1, 1, 1] : [1, 1, 1, 1, 1];
-    tallCap = 8; tiers = 2;
-  } else if (level <= 6) {                       // 5~6레벨: 좌우 3단
-    counts = [2, 2, 2, 2, 2]; tallCap = 8; tiers = 3;
-  } else if (level <= 9) {
-    counts = [3, 2, 2, 2, 2]; tallCap = 12; tiers = 3;
-  } else if (level <= 12) {                      // 10~: 좌우 4단 (샘플 배치)
-    counts = [3, 3, 3, 3, 3]; tallCap = 12; tiers = 4;
-  } else if (level <= 15) {
-    counts = [4, 3, 3, 3, 3]; tallCap = 12; tiers = 4;
-  } else if (level <= 19) {
-    counts = [4, 4, 3, 3, 3]; tallCap = 12; tiers = 4;
-  } else {                                       // 20레벨 이상: 최대 배치
-    counts = [4, 4, 3, 3, 3]; tallCap = 16; tiers = 4;
-  }
+  var tiers, per, tallCap, counts, i;
+  if (level <= 1)       { tiers = 1; per = 3; tallCap = 0;  counts = [1, 1, 1, 1]; }
+  else if (level <= 2)  { tiers = 1; per = 4; tallCap = 0;  counts = [1, 1, 1, 1, 1, 1]; }
+  else if (level <= 3)  { tiers = 2; per = 2; tallCap = 8;  counts = [1, 1, 1, 1]; }
+  else if (level <= 4)  { tiers = 2; per = 3; tallCap = 8;  counts = [2, 2, 2, 1, 1]; }
+  else if (level <= 5)  { tiers = 3; per = 2; tallCap = 8;  counts = [2, 2, 2, 1, 1]; }
+  else if (level <= 6)  { tiers = 3; per = 3; tallCap = 8;  counts = [3, 3, 3, 3, 2]; }
+  else if (level <= 7)  { tiers = 3; per = 3; tallCap = 12; counts = [3, 3, 3, 2, 2]; }
+  else if (level <= 8)  { tiers = 3; per = 4; tallCap = 12; counts = [4, 4, 4, 4, 3]; }
+  else if (level <= 9)  { tiers = 4; per = 3; tallCap = 12; counts = [4, 4, 4, 4, 3]; }
+  else if (level <= 12) { tiers = 4; per = 3; tallCap = 16; counts = [4, 4, 4, 3, 3]; }
+  else if (level <= 15) { tiers = 4; per = 3; tallCap = 12; counts = [5, 4, 4, 3, 3]; }
+  else if (level <= 19) { tiers = 4; per = 3; tallCap = 16; counts = [5, 4, 3, 3, 3]; }
+  else if (level <= 24) { tiers = 4; per = 3; tallCap = 16; counts = [6, 3, 3, 3, 3]; }
+  else if (level <= 29) { tiers = 4; per = 3; tallCap = 16; counts = [6, 4, 3, 3, 2]; }
+  else                  { tiers = 4; per = 3; tallCap = 16; counts = [7, 3, 3, 3, 2]; }
+
+  var tall = tallCap > 0;
+  var normalBottles = 2 * tiers * per;                            // 좌우 대칭 배치
   var normalColors = counts.length;
-  var colors = normalColors + (tall ? 1 : 0);                 // 목표 색 포함
-  var filled = 0, i;
+  var colors = normalColors + (tall ? 1 : 0);                     // 목표 색 포함
+  var filled = 0;
   for (i = 0; i < counts.length; i++) filled += counts[i];
-  if (tall) filled += tallCap / 4;                             // 목표 색 몫 병 수
-  var normalBottles = filled + 2;                              // + 여유 빈 병 2
-  var depth = Math.min(220, 26 + normalBottles * 9);           // 뒤섞는 횟수
+  if (tall) filled += tallCap / 4;                                // 목표 색 몫 병 수
+  var spare = normalBottles - filled;                             // 섞기용 여유 병 (보통 2)
+  var depth = Math.min(260, 24 + normalBottles * 10);             // 뒤섞는 횟수
   return {
     colors: colors, normalColors: normalColors, tall: tall, tallCap: tallCap,
-    counts: counts, empties: 2, tiers: tiers, normalBottles: normalBottles,
-    units: filled - (tall ? tallCap / 4 : 0) + (tall ? 1 : 0), // 진행도 분모(완성 병 수)
+    counts: counts, spare: spare, tiers: tiers, per: per, normalBottles: normalBottles,
+    /* 3레벨부터는 빈 병 없이 시작한다 (여유는 여러 병 윗칸에 나뉜다). 1~2레벨은 튜토리얼 */
+    startEmpties: tall ? 0 : spare,
+    units: filled - (tall ? tallCap / 4 : 0) + (tall ? 1 : 0),    // 진행도 분모(완성 병 수)
     depth: depth, level: level
   };
 }
@@ -458,7 +479,7 @@ function makeBottles(cfg, goal, copies) {
     for (i = 0; i < k; i++)
       out.push({ cells: new Array(4).fill(c), cap: 4, tall: false, goal: null, levelGoal: hasGoal ? goal : null });
   }
-  var emptySlots = cfg.empties + (cfg.tall ? cfg.tallCap / 4 : 0);
+  var emptySlots = cfg.spare + (cfg.tall ? cfg.tallCap / 4 : 0);
   for (e = 0; e < emptySlots; e++)
     out.push({ cells: [], cap: 4, tall: false, goal: null, levelGoal: hasGoal ? goal : null });
   if (cfg.tall)
@@ -668,13 +689,52 @@ function countMixed(state) {
   return n;
 }
 
+/* 시작 상태에 남은 빈 일반 병 / 1칸짜리 일반 병 수 */
+function countEmpty(state) {
+  var n = 0, i;
+  for (i = 0; i < state.length; i++) if (!state[i].tall && !state[i].cells.length) n++;
+  return n;
+}
+function countThin(state) {
+  var n = 0, i;
+  for (i = 0; i < state.length; i++) if (!state[i].tall && state[i].cells.length === 1) n++;
+  return n;
+}
+
+/* 시작 상태에서 빈 일반 병을 없앤다.
+   다른 병의 맨 위 색 1~3칸을 빈 병으로 옮기는 '역연산'만 쓰므로 정답 순서는 그대로 유효하다.
+   옮기는 병은 1칸 이상 남기고(빈 병을 새로 만들지 않음), 빈 병에 4칸(=완성·잠금)은 넣지 않는다. */
+function fillEmptyBottles(state, moves, rng, budget) {
+  var guard = 0, i, bi, k, cands, emptyIdx, B, tr, maxK;
+  while (guard++ < (budget || 90)) {
+    emptyIdx = -1;
+    for (i = 0; i < state.length; i++) {
+      if (!state[i].tall && !state[i].cells.length) { emptyIdx = i; break; }
+    }
+    if (emptyIdx < 0) return true;                                  // 빈 병 없음
+    cands = [];
+    for (bi = 0; bi < state.length; bi++) {
+      if (bi === emptyIdx) continue;
+      B = state[bi];
+      if (B.tall || !B.cells.length) continue;
+      tr = topRun(B.cells);
+      /* k < tr.n 이어야 정방향에서 '맨 위 색 같음'이 성립하고, k < B.cells.length 이어야 B가 비지 않는다 */
+      maxK = Math.min(tr.n - 1, B.cells.length - 1, 3);
+      for (k = 1; k <= maxK; k++) cands.push({ b: bi, a: emptyIdx, k: k, w: k === 2 ? 6 : (k === 3 ? 5 : 2) });
+    }
+    if (!cands.length) return false;                                // 옮길 덩어리가 없음
+    applyReverse(state, pickWeighted(cands, rng), moves);
+  }
+  return false;
+}
+
 /* 레벨 생성 (항상 풀 수 있는 판) */
 function generateLevel(level, seed) {
   var cfg = levelConfig(level);
   var best = null, bestScore = -Infinity, round, attempt;
 
   for (round = 0; round < 3; round++) {
-    for (attempt = 0; attempt < 48; attempt++) {
+    for (attempt = 0; attempt < 60; attempt++) {
       var rng = mulberry32((seed + round * 7919 + Math.imul(attempt, 2654435761)) >>> 0);
       var goal = cfg.tall ? Math.floor(rng() * cfg.colors) : null;   // 가운데 긴 병의 목표 색
       var copies = pickCopies(cfg, goal, rng);
@@ -692,20 +752,28 @@ function generateLevel(level, seed) {
       var moves = scramble(state, cfg.depth, rng);
       if (!moves) continue;
 
-      var tallLen = -1, empties = 0;
-      for (i = 0; i < state.length; i++) {
-        if (state[i].tall) tallLen = state[i].cells.length;
-        else if (!state[i].cells.length) empties++;
+      /* 3레벨부터: 시작할 때 빈 일반 병 0개.
+         섞다가 남은 빈 병은 다른 병 윗칸(1~3칸)을 옮겨 채운다 → 여유 8칸이 여러 병에 나뉜다 */
+      var empties = countEmpty(state);
+      if (empties > cfg.startEmpties) {
+        if (cfg.startEmpties !== 0) continue;
+        if (!fillEmptyBottles(state, moves, rng, 90)) continue;
+        empties = countEmpty(state);
+        if (empties > 0) continue;
       }
+
+      var tallLen = -1;
+      for (i = 0; i < state.length; i++) if (state[i].tall) tallLen = state[i].cells.length;
       if (cfg.tall && tallLen !== 0) continue;                       // 가운데 병은 반드시 0칸으로 시작
       if (isWin(state)) continue;                                    // 이미 완성된 판은 버린다
 
       var split = splitColors(state);
       var mixed = countMixed(state);
       var done = countSettled(state);
-      var score = split * 90 + mixed * 14 + moves.length * 0.8 - done * 30 + empties * 10;
+      var thin = countThin(state);
+      var score = split * 90 + mixed * 14 + moves.length * 0.8 - done * 30 - thin * 8 + (cfg.startEmpties ? empties * 10 : 0);
       var result = { bottles: state, cfg: cfg, goal: goal, moves: moves, attempt: attempt,
-                     split: split, mixed: mixed, done: done, score: score };
+                     split: split, mixed: mixed, done: done, empties: empties, thin: thin, score: score };
       /* 목표: 모든 색이 여러 병에 흩어지고, 처음부터 완성된 병이 없고, 대부분 병이 섞인 상태 */
       if (split >= cfg.colors && done === 0 && mixed >= cfg.normalBottles - 3) return result;
       if (score > bestScore) { bestScore = score; best = result; }
@@ -972,7 +1040,7 @@ function updateHud() {
 var GX = 0.10;          // 병 사이·양끝 여백 (병 폭 대비)
 var BOTTLE_H = 3.62;    // 병 한 개 + 선반 두께 (병 폭 대비)
 var TALL_SPAN = 1.09;   // 가운데 긴 병이 차지하는 폭 + 간격
-var MIN_BW = 26;
+var MIN_BW = 21;
 
 function planTiers(nL, W, H, tall, badgeH) {
   var rowGap = Math.max(8, Math.min(22, H * 0.021));
@@ -1272,7 +1340,7 @@ function onBottleClick(id) {
   shakeEl(b.el);
   if (b.cells.length >= b.cap) setStatus('병이 가득 찼어요');
   else if (b.goal !== null && b.goal !== undefined) setStatus('가운데 긴 병에는 ' + COLOR_NAMES[b.goal] + '만 부을 수 있어요');
-  else setStatus('맨 위 색이 같아야 부을 수 있어요 (빈 병은 언제나 가능)');
+  else setStatus('맨 위 색이 같아야 부을 수 있어요');
 
   if (b.cells.length) selectBottle(id);
 }
@@ -1357,7 +1425,7 @@ function startLevel(level, seed) {
   var goalBottle = null;
   game.bottles.forEach(function (b) { if (b.tall) goalBottle = b; });
   setStatus(goalBottle
-    ? '가운데 병은 비어 있어요 — ' + COLOR_NAMES[goalBottle.goal] + ' ' + goalBottle.cap + '칸을 모아 채우면 클리어'
+    ? '가운데 병에 ' + COLOR_NAMES[goalBottle.goal] + ' ' + goalBottle.cap + '칸을 모으면 클리어'
     : '병을 눌러 고른 뒤, 다른 병을 눌러 부으세요');
 
   window.scrollTo(0, 0);
@@ -1496,6 +1564,8 @@ window.__wsp = {
             if (col === g.goal) goalCells++;
           }
         }
+        var emptyOk = !g.cfg.tall || emptyBottles === 0;          // 3레벨부터 시작 시 빈 일반 병 0개
+        var symOk = normals % 2 === 0 && normals === g.cfg.normalBottles;  // 좌우 같은 병 수
         var shapeOk = normals === g.cfg.normalBottles &&
                       (!g.cfg.tall || (tallStart === 0 && goalCells === g.cfg.tallCap)) &&
                       (!g.cfg.tall || signs.length === g.cfg.normalBottles + 1);
@@ -1539,11 +1609,12 @@ window.__wsp = {
           if (bb.cells.length !== bb.cap) goalOk = false;
         }
 
-        var ok = replayOk && solved && !alreadyWon && !lockViolation && goalOk && shapeOk && colorOk;
+        var ok = replayOk && solved && !alreadyWon && !lockViolation && goalOk && shapeOk && colorOk && emptyOk && symOk;
         if (!ok) {
           allOk = false;
           if (fails.length < 8) fails.push({ level: L, seed: seed, replay: replayOk, solved: solved,
             won: alreadyWon, lock: lockViolation, goal: goalOk, shape: shapeOk, color: colorOk,
+            empty: emptyOk, sym: symOk, empties: emptyBottles,
             normals: normals, tallStart: tallStart, goalCells: goalCells });
         }
         if (steps < minSteps) minSteps = steps;
@@ -1561,7 +1632,8 @@ window.__wsp = {
     return { allOk: allOk, minSteps: minSteps, maxSteps: maxSteps, avgSteps: cases ? sumSteps / cases : 0,
              fails: fails, samples: report, levelSpec: levelSpec,
              avgMixed: cases ? sumMixed / cases : 0, avgDone: cases ? sumDone / cases : 0,
-             avgMs: cases ? sumMs / cases : 0, slowestMs: slowestMs, cases: cases };
+             avgMs: cases ? sumMs / cases : 0, slowestMs: slowestMs, cases: cases,
+             lastEmpties: emptyBottles };
   }
 };
 </script>
