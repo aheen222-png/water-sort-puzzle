@@ -488,6 +488,16 @@ body{
 .roomup .info .pr.ok{ color:#7fe6b4; }
 .roomup .info .pr.no{ color:#ff9aa8; }
 .roomup.locked{ opacity:.55; }
+/* 방 단계 레벨 잠금 — 썸네일 위 요구 레벨 배지 */
+.roomup{ position:relative; }
+.roomup .tag.lv{
+  position:absolute; left:8px; top:8px; z-index:1; display:inline-flex; align-items:center; gap:3px;
+  font-size:9.5px; font-weight:800; letter-spacing:-.2px; padding:3px 7px; border-radius:999px;
+  background:rgba(20,26,48,.92); color:#9fd0ff; border:1px solid rgba(140,190,255,.5);
+  box-shadow:0 3px 10px rgba(0,0,0,.4);
+}
+.roomup.lvl .pv{ filter:saturate(.5) brightness(.78); }
+.roomup .info .pr.lvreq{ color:#9fd0ff; }
 
 /* 안내·토스트 */
 .room-hint{
@@ -591,22 +601,42 @@ body{
   .pet{ animation:none !important; }
 }
 
-/* ================= 미구입 아이템 미리보기 · 자물쇠 잠금 ================= */
+/* ================= 미구입 아이템 미리보기 · 자물쇠 잠금 (크게) ================= */
 .stage-lock{
   position:absolute; inset:0; z-index:3; display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:6px; padding:8px;
-  background:linear-gradient(180deg, rgba(6,8,18,.02) 0%, rgba(6,8,18,.26) 100%);
+  background:
+    radial-gradient(92% 90% at 50% 46%, rgba(5,7,16,.08) 0%, rgba(5,7,16,.32) 58%, rgba(5,7,16,.62) 100%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 8px, rgba(255,255,255,0) 8px 22px);
   animation:lkIn .18s ease-out both;
 }
 .stage-lock[hidden]{ display:none; }
 @keyframes lkIn{ from{ opacity:0 } to{ opacity:1 } }
-.lk-veil{ display:flex; flex-direction:column; align-items:center; gap:5px; color:#fff; margin-bottom:84px; }
-.stage-lock .lk-big{ width:46px; height:46px; color:rgba(255,255,255,.94); filter:drop-shadow(0 6px 16px rgba(0,0,0,.6)); }
-.room-stage .stage-lock .lk-big{ width:46px; height:46px; }
+@keyframes lkPop{ from{ opacity:0; transform:scale(.72) } to{ opacity:1; transform:none } }
+/* 미리보기 중에는 방 그림을 흐릿·어둡게 — 실루엣만 살짝 비친다 */
+.stage-art.pv{ filter:blur(2.2px) brightness(.92) saturate(.8); transform:scale(1.03); }
+.lk-veil{ display:flex; flex-direction:column; align-items:center; gap:9px; color:#fff; }
+.lk-medal{
+  width:clamp(118px, 36vw, 156px); aspect-ratio:1/1; border-radius:50%; display:grid; place-items:center;
+  background:radial-gradient(circle at 50% 38%, rgba(255,228,160,.20), rgba(16,18,36,.5) 58%, rgba(8,10,20,.72) 100%);
+  border:1.5px solid rgba(255,220,145,.55);
+  box-shadow:0 16px 36px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.26),
+             0 0 0 9px rgba(255,214,120,.07), 0 0 30px rgba(255,206,108,.26);
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  animation:lkPop .34s cubic-bezier(.22,1.3,.4,1) both;
+}
+.stage-lock .lk-big{
+  width:66%; height:66%; color:#ffe6a8;
+  filter:drop-shadow(0 2px 0 rgba(78,50,0,.35)) drop-shadow(0 0 15px rgba(255,206,102,.6)) drop-shadow(0 12px 22px rgba(0,0,0,.7));
+}
 .lk-cap{
-  font-size:10.5px; font-weight:800; letter-spacing:-.2px; padding:3px 10px; border-radius:999px;
-  background:rgba(10,12,26,.66); border:1px solid rgba(255,255,255,.3); color:#fff;
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:12.5px; font-weight:900; letter-spacing:-.35px; padding:7px 15px; border-radius:999px;
+  background:linear-gradient(180deg, rgba(48,36,20,.94), rgba(15,13,26,.94));
+  border:1px solid rgba(255,214,120,.6); color:#ffe9b8;
+  box-shadow:0 10px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.18);
   backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  white-space:nowrap;
 }
 .lk-bar{
   flex:0 0 auto; display:flex; align-items:center; gap:8px; margin:6px 0 2px; padding:8px 9px;
@@ -766,13 +796,15 @@ body{
     </div>
     <div class="stage-lock" id="stageLock" hidden>
       <div class="lk-veil">
-        <svg class="lk-big" viewBox="0 0 48 48" aria-hidden="true">
-          <path d="M15 22v-6a9 9 0 0 1 18 0v6" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/>
-          <rect x="9" y="21" width="30" height="20" rx="6" fill="currentColor"/>
-          <circle cx="24" cy="29.5" r="2.8" fill="#141024"/>
-          <path d="M24 31.6v4.4" stroke="#141024" stroke-width="2.8" stroke-linecap="round"/>
-        </svg>
-        <span class="lk-cap">미리보기 · 잠김</span>
+        <div class="lk-medal">
+          <svg class="lk-big" viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M15 22v-6a9 9 0 0 1 18 0v6" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+            <rect x="9" y="21" width="30" height="20" rx="6" fill="currentColor"/>
+            <circle cx="24" cy="29.5" r="2.9" fill="#241a08"/>
+            <path d="M24 31.8v4.4" stroke="#241a08" stroke-width="2.9" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <span class="lk-cap" id="lkCap">미리보기 · 구매 후 적용</span>
       </div>
     </div>
   </div>
@@ -2153,25 +2185,25 @@ var Room = (function () {
      bg: 단계마다 1장씩 다른 배경 일러스트(assets/). 한 단계 오를 때마다 방 그림이 눈에 띄게 달라진다. */
   var RG = [
     { n: 1,  name: '낡은 단칸방',       sub: '찢어진 벽지 · 알전구 · 낡은 마루', price: 0,    cap: 1, bg: 'stage01.webp' },
-    { n: 2,  name: '정리한 고시원',     sub: '닦은 장판 · 벽시계 · 정리된 선반',  price: 120,  cap: 1, bg: 'stage02.webp' },
-    { n: 3,  name: '골목 반지하',       sub: '반달 창 · 달빛 한 줄',             price: 210,  cap: 1, bg: 'stage03.webp' },
-    { n: 4,  name: '볕 드는 옥탑방',    sub: '옥상 빨랫줄 · 창가 햇살',          price: 300,  cap: 2, bg: 'stage04.webp' },
-    { n: 5,  name: '햇살 원룸',         sub: '밝은 벽지 · 하늘 창',              price: 390,  cap: 2, bg: 'stage05.webp' },
-    { n: 6,  name: '복층 스튜디오',     sub: '사다리 선반 · 높은 창',            price: 500,  cap: 3, bg: 'stage06.webp' },
-    { n: 7,  name: '감성 오피스텔',     sub: '스트링 라이트 · 무드등',           price: 620,  cap: 3, bg: 'stage07.webp' },
-    { n: 8,  name: '아늑한 투룸',       sub: '아치 창 · 노을 · 벽난로',          price: 750,  cap: 3, bg: 'stage08.webp' },
-    { n: 9,  name: '화분 가득 테라스',  sub: '테라스 화단 · 넝쿨',               price: 890,  cap: 4, bg: 'stage09.webp' },
-    { n: 10, name: '노을 뷰 하우스',    sub: '긴 창으로 드는 저녁 빛',           price: 1040, cap: 4, bg: 'stage10.webp' },
-    { n: 11, name: '루프탑 아파트',     sub: '밤하늘 · 도시 야경',               price: 1200, cap: 4, bg: 'stage11.webp' },
-    { n: 12, name: '모던 펜트하우스',   sub: '대리석 바닥 · 다운라이트',          price: 1370, cap: 4, bg: 'stage12.webp' },
-    { n: 13, name: '시티뷰 스위트',     sub: '통창 프레임 · 반사빛',             price: 1550, cap: 5, bg: 'stage13.webp' },
-    { n: 14, name: '하이엔드 빌라',     sub: '아트월 · 우아한 소품',             price: 1740, cap: 5, bg: 'stage14.webp' },
-    { n: 15, name: '가든 저택',         sub: '정원 넝쿨 · 바닥 화분',            price: 1940, cap: 5, bg: 'stage15.webp' },
-    { n: 16, name: '로열 타운하우스',   sub: '기둥 · 레드 커튼',                 price: 2150, cap: 5, bg: 'stage16.webp' },
-    { n: 17, name: '그랜드 저택',       sub: '샹들리에 · 금장 몰딩',             price: 2370, cap: 5, bg: 'stage17.webp' },
-    { n: 18, name: '로열 팰리스',       sub: '황금 벽 · 붉은 융단',               price: 2600, cap: 5, bg: 'stage18.webp' },
-    { n: 19, name: '황금 궁궐',         sub: '황금 기둥 · 레드 카펫',             price: 2840, cap: 5, bg: 'stage19.webp' },
-    { n: 20, name: '전설의 크라운 팰리스', sub: '왕관 홀 · 황금 빛',              price: 3090, cap: 5, bg: 'stage20.webp' }
+    { n: 2,  name: '정리한 고시원',     sub: '닦은 장판 · 벽시계 · 정리된 선반',  price: 120, reqLv: 5,  cap: 1, bg: 'stage02.webp' },
+    { n: 3,  name: '골목 반지하',       sub: '반달 창 · 달빛 한 줄',             price: 210, reqLv: 10,  cap: 1, bg: 'stage03.webp' },
+    { n: 4,  name: '볕 드는 옥탑방',    sub: '옥상 빨랫줄 · 창가 햇살',          price: 300, reqLv: 15,  cap: 2, bg: 'stage04.webp' },
+    { n: 5,  name: '햇살 원룸',         sub: '밝은 벽지 · 하늘 창',              price: 390, reqLv: 20,  cap: 2, bg: 'stage05.webp' },
+    { n: 6,  name: '복층 스튜디오',     sub: '사다리 선반 · 높은 창',            price: 500, reqLv: 25,  cap: 3, bg: 'stage06.webp' },
+    { n: 7,  name: '감성 오피스텔',     sub: '스트링 라이트 · 무드등',           price: 620, reqLv: 30,  cap: 3, bg: 'stage07.webp' },
+    { n: 8,  name: '아늑한 투룸',       sub: '아치 창 · 노을 · 벽난로',          price: 750, reqLv: 35,  cap: 3, bg: 'stage08.webp' },
+    { n: 9,  name: '화분 가득 테라스',  sub: '테라스 화단 · 넝쿨',               price: 890, reqLv: 40,  cap: 4, bg: 'stage09.webp' },
+    { n: 10, name: '노을 뷰 하우스',    sub: '긴 창으로 드는 저녁 빛',           price: 1040, reqLv: 45, cap: 4, bg: 'stage10.webp' },
+    { n: 11, name: '루프탑 아파트',     sub: '밤하늘 · 도시 야경',               price: 1200, reqLv: 50, cap: 4, bg: 'stage11.webp' },
+    { n: 12, name: '모던 펜트하우스',   sub: '대리석 바닥 · 다운라이트',          price: 1370, reqLv: 55, cap: 4, bg: 'stage12.webp' },
+    { n: 13, name: '시티뷰 스위트',     sub: '통창 프레임 · 반사빛',             price: 1550, reqLv: 60, cap: 5, bg: 'stage13.webp' },
+    { n: 14, name: '하이엔드 빌라',     sub: '아트월 · 우아한 소품',             price: 1740, reqLv: 65, cap: 5, bg: 'stage14.webp' },
+    { n: 15, name: '가든 저택',         sub: '정원 넝쿨 · 바닥 화분',            price: 1940, reqLv: 70, cap: 5, bg: 'stage15.webp' },
+    { n: 16, name: '로열 타운하우스',   sub: '기둥 · 레드 커튼',                 price: 2150, reqLv: 75, cap: 5, bg: 'stage16.webp' },
+    { n: 17, name: '그랜드 저택',       sub: '샹들리에 · 금장 몰딩',             price: 2370, reqLv: 80, cap: 5, bg: 'stage17.webp' },
+    { n: 18, name: '로열 팰리스',       sub: '황금 벽 · 붉은 융단',               price: 2600, reqLv: 85, cap: 5, bg: 'stage18.webp' },
+    { n: 19, name: '황금 궁궐',         sub: '황금 기둥 · 레드 카펫',             price: 2840, reqLv: 90, cap: 5, bg: 'stage19.webp' },
+    { n: 20, name: '전설의 크라운 팰리스', sub: '왕관 홀 · 황금 빛',              price: 3090, reqLv: 95, cap: 5, bg: 'stage20.webp' }
   ];
   /* 예전 5단계 저장을 새 단계로 이사시킨다 (해금한 방은 그대로 유지) */
   var GRADE_OLD = { 1: 1, 2: 5, 3: 8, 4: 12, 5: 19 };
@@ -4454,6 +4486,13 @@ var Room = (function () {
 
   function playerLevel() { return Math.max(1, num(store('wsp.level'), 1)); }
   function levelLocked(it) { return playerLevel() < (it.req || 1); }
+  /* 방 단계 해금 레벨 — 2단계 Lv.5 부터 20단계 Lv.95 까지 5레벨 간격 */
+  function gradeReqLv(g) { return (g && g.reqLv) || 1; }
+  function gradeLocked(g) { return playerLevel() < gradeReqLv(g); }
+  /* 친구 입양 해금 레벨 — 1번째 무료(Lv.1) · 2번째 15 · 3번째 35 · 4번째 60 · 5번째 85 */
+  var PET_REQ = [1, 15, 35, 60, 85];
+  function petReqLv() { return PET_REQ[Math.min(RS.pets.length, PET_REQ.length - 1)]; }
+  function petLevelLocked() { return playerLevel() < petReqLv(); }
 
   /* 두 번 눌러 확인 — 입양·이사처럼 바로 코인이 빠지는 곳의 실수 결제 방지 */
   var armed = {}, armedAt = {};
@@ -4520,24 +4559,30 @@ var Room = (function () {
     var note = el('lkNote'), b = el('lkBuy');
     if (gp) {
       if (el('lkName')) el('lkName').textContent = gp.n + '단계 · ' + gp.name;
+      if (el('lkCap')) el('lkCap').textContent = '미리보기 · 이사 후 적용';
       if (el('lkSlot')) el('lkSlot').textContent = '방 · 미리보기 · 잠김';
       var isNext = gp.n === RS.maxGrade + 1, gShort = RS.coins < gp.price;
+      var gLvLock = gradeLocked(gp), gReq = gradeReqLv(gp);
       if (note) {
-        note.hidden = !(!isNext || gShort);
+        note.hidden = !(!isNext || gShort || gLvLock);
         note.textContent = !isNext
           ? ('방은 한 단계씩 이사할 수 있어요 · 지금 ' + RG[RS.maxGrade - 1].n + '단계 ' + RG[RS.maxGrade - 1].name + '까지 왔어요')
-          : ('코인 ' + fmt(Math.max(0, gp.price - RS.coins)) + '개 더 모으면 이사할 수 있어요');
+          : (gLvLock
+              ? ('Lv.' + gReq + ' 달성 시 이사할 수 있어요 · 지금 Lv.' + playerLevel())
+              : ('코인 ' + fmt(Math.max(0, gp.price - RS.coins)) + '개 더 모으면 이사할 수 있어요'));
       }
       if (b) {
-        b.disabled = !isNext;
-        b.className = 'lk-buy' + (!isNext ? ' off' : (gShort ? ' short' : ''));
+        b.disabled = !isNext || gLvLock;
+        b.className = 'lk-buy' + ((!isNext || gLvLock) ? ' off' : (gShort ? ' short' : ''));
         b.textContent = !isNext ? ('지금은 ' + (RS.maxGrade + 1) + '단계부터')
-          : (gShort ? ('코인 ' + fmt(gp.price - RS.coins) + ' 부족') : ('이사하기 (' + fmt(gp.price) + ')'));
+          : (gLvLock ? ('Lv.' + gReq + ' 필요')
+          : (gShort ? ('코인 ' + fmt(gp.price - RS.coins) + ' 부족') : ('이사하기 (' + fmt(gp.price) + ')')));
       }
       return;
     }
     var lv = playerLevel(), req = it.req || 1, lvLock = lv < req, short = RS.coins < it.price;
     if (el('lkName')) el('lkName').textContent = it.name;
+    if (el('lkCap')) el('lkCap').textContent = '미리보기 · 구매 후 적용';
     if (el('lkSlot')) el('lkSlot').textContent = slotLabel(it.slot) + ' · 미리보기 · 잠김' + (many ? ' · ' + pvCount() + '칸 겹쳐보기' : '');
     if (note) {
       note.hidden = !(lvLock || short);
@@ -4579,7 +4624,9 @@ var Room = (function () {
     pvFocus = { kind: 'grade', n: n };
     renderScene();
     Sound.pick();
-    toast(g.n + '단계 ' + g.name + ' 미리보기 · 아래 이사하기 버튼으로 결제');
+    toast(gradeLocked(g)
+      ? (g.n + '단계 ' + g.name + ' 미리보기 · Lv.' + gradeReqLv(g) + ' 달성 시 이사할 수 있어요')
+      : (g.n + '단계 ' + g.name + ' 미리보기 · 아래 이사하기 버튼으로 결제'));
   }
   function clearPreview() {
     if (!hasPreview()) return;
@@ -4644,19 +4691,24 @@ var Room = (function () {
 
   function breedCard(b) {
     var have = hasBreed(b.id), pr = adoptPrice(b);
-    var starved = !have && (RS.coins < pr || petsAtCap());
-    return '<div class="item breed' + (have ? ' owned' : '') + (starved ? ' poor' : '') + '" data-breed="' + b.id + '">' +
-      (have ? '<span class="tag">내 친구</span>' : '') +
+    var lvLock = !have && petLevelLocked(), reqLv = petReqLv();
+    var starved = !have && (lvLock || RS.coins < pr || petsAtCap());
+    return '<div class="item breed' + (have ? ' owned' : '') + (starved ? ' poor' : '') +
+             (!have && lvLock ? ' lvl' : '') + '" data-breed="' + b.id + '">' +
+      (have ? '<span class="tag">내 친구</span>' : (lvLock ? '<span class="tag lv">Lv.' + reqLv + '</span>' : '')) +
       '<div class="thumb img"><img src="' + ASSET + b.id + '.webp" alt=""></div>' +
       '<div class="nm">' + b.name + '</div>' +
       '<div class="tagline">' + b.tag + '</div>' +
-      '<div class="pr">' + (have ? '함께 사는 중' : (pr === 0 ? '첫 입양 무료' : COIN + ' ' + fmt(pr))) + '</div>' +
+      '<div class="pr">' + (have ? '함께 사는 중'
+        : (lvLock ? 'Lv.' + reqLv + ' 해금'
+        : (pr === 0 ? '첫 입양 무료' : COIN + ' ' + fmt(pr)))) + '</div>' +
     '</div>';
   }
 
   function petRoster() {
     var i, s = '', n = RS.pets.length, cap = capShown(), lead = leadIndex();
     s += '<p class="room-hint">' + RS.grade + '단계 방 · 함께 살 수 있는 친구 <b>' + cap + '마리</b> (지금 ' + n + '마리). ' +
+         (n < cap && petLevelLocked() ? ('다음 친구는 <b>Lv.' + petReqLv() + '</b>부터. ') : '') +
          '이름을 눌러 직접 바꿀 수 있어요.</p>';
     if (!n) {
       s += '<p class="room-hint">위 <b>첫 친구 무료 입양</b> 버튼을 눌러 고양이·강아지 중 한 마리를 맞이해 보세요.</p>';
@@ -4675,7 +4727,9 @@ var Room = (function () {
       '</div>';
     }
     s += '</div>';
-    if (n < cap) s += '<p class="room-hint"><b>입양</b> 탭에서 새 품종을 맞이할 수 있어요.</p>';
+    if (n < cap) s += petLevelLocked()
+      ? ('<p class="room-hint">다음 친구는 <b>Lv.' + petReqLv() + '</b>부터 입양할 수 있어요.</p>')
+      : '<p class="room-hint"><b>입양</b> 탭에서 새 품종을 맞이할 수 있어요.</p>';
     else if (RS.maxGrade < GRADE_MAX) s += '<p class="room-hint">지금 방은 가득 찼어요. <b>방</b> 탭에서 이사하면 ' + RG[RS.maxGrade].cap + '마리까지 늘어나요.</p>';
     else s += '<p class="room-hint">궁궐에는 다섯 친구까지 함께 살 수 있어요.</p>';
     return s;
@@ -4693,6 +4747,8 @@ var Room = (function () {
       var dogs = BREEDS.filter(function (b) { return b.kind === 'dog'; });
       if (petsAtCap() && RS.maxGrade < GRADE_MAX) {
         s += '<p class="room-hint">지금 방은 <b>' + capacity() + '마리</b>까지예요. <b>방</b> 탭에서 이사하면 더 입양할 수 있어요.</p>';
+      } else if (petLevelLocked()) {
+        s += '<p class="room-hint">' + (RS.pets.length + 1) + '번째 친구는 <b>Lv.' + petReqLv() + '</b>부터 입양할 수 있어요 (지금 Lv.' + playerLevel() + '). 레벨을 올리면 열려요.</p>';
       } else if (!RS.pets.length) {
         s += '<p class="room-hint">첫 친구는 <b>무료</b>예요. 고양이·강아지 중 마음에 드는 품종을 골라 주세요.</p>';
       } else {
@@ -4704,14 +4760,18 @@ var Room = (function () {
       s += '<p class="room-hint">살았던 방은 언제든 눌러서 <b>무료로 돌아갈</b> 수 있어요. 아직 못 가 본 방은 눌러서 미리 보기 → <b>이사하기</b> 버튼으로 결제해요.</p>';
       RG.forEach(function (g) {
         var cur = RS.grade === g.n, unlocked = RS.maxGrade >= g.n, next = g.n === RS.maxGrade + 1;
+        var lvLock = !unlocked && gradeLocked(g), reqLv = gradeReqLv(g);
         var priceTxt = cur ? '현재 방'
           : (unlocked ? '보유 · 눌러서 이동'
-          : (g.n === 1 ? '기본 방' : COIN + ' ' + fmt(g.price)));
-        var cls = 'roomup' + (cur ? ' on' : '') + (unlocked && !cur ? ' have' : '') + (!unlocked && !next ? ' locked' : '');
+          : (g.n === 1 ? '기본 방'
+          : (lvLock ? 'Lv.' + reqLv + ' 해금 · ' + fmt(g.price) : COIN + ' ' + fmt(g.price))));
+        var cls = 'roomup' + (cur ? ' on' : '') + (unlocked && !cur ? ' have' : '') +
+                  (!unlocked && !next ? ' locked' : '') + (lvLock ? ' lvl' : '');
         s += '<div class="' + cls + '" data-grade="' + g.n + '">' +
+          (lvLock ? '<span class="tag lv">Lv.' + reqLv + '</span>' : '') +
           '<div class="pv">' + sceneSvg({ grade: g.n, pets: RS.pets.slice(0, g.cap), lead: leadIndex(), hat: 'hat_none', outfit: 'outfit_rag', bed: 'bed_box', wall: 'wall_old', frame: 'frame_empty', rug: 'rug_none', light: 'light_bulb', deco: 'deco_none' }) + '</div>' +
           '<div class="info"><b>' + g.n + '단계 · ' + g.name + '</b><small>' + g.sub + ' · 친구 ' + g.cap + '마리</small>' +
-          '<span class="pr' + (cur ? ' ok' : (unlocked ? ' ok' : (next ? '' : ' no'))) + '">' + priceTxt + '</span></div>' +
+          '<span class="pr' + (cur ? ' ok' : (unlocked ? ' ok' : (lvLock ? ' lvreq' : (next ? '' : ' no')))) + '">' + priceTxt + '</span></div>' +
         '</div>';
       });
     } else if (curTab === 'deco') {
@@ -4841,6 +4901,11 @@ var Room = (function () {
       Sound.fail();
       return;
     }
+    if (gradeLocked(g)) {
+      toast('Lv.' + gradeReqLv(g) + ' 달성 시 이사할 수 있어요 · 지금 Lv.' + playerLevel());
+      Sound.fail();
+      return;
+    }
     if (RS.coins < g.price) {
       toast('코인이 ' + fmt(g.price - RS.coins) + '개 부족해요 · 판을 깨서 모아 보세요');
       Sound.fail();
@@ -4865,6 +4930,11 @@ var Room = (function () {
     if (petsAtCap()) {
       if (RS.maxGrade < GRADE_MAX) toast('지금 방은 ' + capacity() + '마리까지예요 · 방을 넓히면 ' + RG[RS.maxGrade].cap + '마리까지');
       else toast('궁궐은 다섯 친구까지 함께 살 수 있어요');
+      Sound.fail();
+      return 0;
+    }
+    if (petLevelLocked()) {
+      toast((RS.pets.length + 1) + '번째 친구는 Lv.' + petReqLv() + ' 부터 입양할 수 있어요 · 지금 Lv.' + playerLevel());
       Sound.fail();
       return 0;
     }
