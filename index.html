@@ -1262,15 +1262,45 @@ function store(key, value) {
 var Sound = (function () {
   var ctx = null;
   var muted = store('wsp.muted') === '1';
+  var armed = false;
 
-  function ac() {
+  function raw() {
     if (!ctx) {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
       try { ctx = new AC(); } catch (e) { return null; }
     }
-    if (ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
     return ctx;
+  }
+  /* iOS Safari·홈 화면 앱은 '사용자 제스처 안에서' resume + 무음 1샘플 재생을 해야
+     오디오 컨텍스트가 running 으로 풀린다. 제스처 밖에서 만든 컨텍스트는 계속 잠긴다. */
+  function kick(c) {
+    if (!c) return;
+    try {
+      if (c.state !== 'running' && c.resume) {
+        var pr = c.resume();
+        if (pr && pr.catch) pr.catch(function () {});
+      }
+      var b = c.createBuffer(1, 1, 22050);
+      var s = c.createBufferSource();
+      s.buffer = b;
+      s.connect(c.destination);
+      if (s.start) s.start(0); else if (s.noteOn) s.noteOn(0);
+    } catch (e) {}
+  }
+  function ac() {
+    var c = raw(); if (!c) return null;
+    if (c.state !== 'running') kick(c);
+    return c;
+  }
+  /* 첫 터치(어디를 눌러도)에서 오디오를 풀어 둔다 — 병을 누르기 전에 소리가 날 수 있게 */
+  function arm() {
+    if (armed) return;
+    armed = true;
+    var fire = function () { if (ctx && ctx.state === 'running') return; kick(raw()); };
+    ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'].forEach(function (t) {
+      document.addEventListener(t, fire, { passive: true, capture: true });
+    });
   }
 
   function tone(freq, opt) {
@@ -1308,9 +1338,13 @@ var Sound = (function () {
     src.start();
   }
 
+  arm();
+
   return {
-    unlock: function () { ac(); },
+    unlock: function () { var c = raw(); if (!c) return false; kick(c); return c.state === 'running'; },
+    rearm: function () { arm(); if (ctx && ctx.state !== 'running') kick(ctx); },
     isMuted: function () { return muted; },
+    isRunning: function () { return !!ctx && ctx.state === 'running'; },
     toggle: function () {
       muted = !muted;
       store('wsp.muted', muted ? '1' : '0');
@@ -2013,8 +2047,10 @@ btnSound.addEventListener('click', function () {
 });
 
 document.addEventListener('visibilitychange', function () {
-  if (!document.hidden) Sound.unlock();
+  if (!document.hidden) Sound.rearm();
 });
+window.addEventListener('pageshow', function () { Sound.rearm(); });
+window.addEventListener('focus', function () { Sound.rearm(); });
 
 var resizeTimer = 0;
 function onResize() {
@@ -4149,41 +4185,41 @@ var Room = (function () {
      neckY: 턱 바로 아래 목둘레 높이, neckCX: 그 목의 가로 중심, chestW: 목 아래 가슴 폭
      (의상은 이 세 값에 맞춰 목을 두르고 어깨를 감싼다 — 품종마다 목 높이가 다르다) */
   var PET_HEAD = {
-    cat_cheese:     { skull: 0.174, hatW: 0.550, headCX: 0.463, eyeY: 0.392, eyeL: 0.346, eyeR: 0.563, neckY: 0.544, neckCX: 0.462, chestW: 0.310 },
-    cat_tuxedo:     { skull: 0.165, hatW: 0.526, headCX: 0.465, eyeY: 0.370, eyeL: 0.330, eyeR: 0.555, neckY: 0.535, neckCX: 0.465, chestW: 0.330 },
-    cat_blue:       { skull: 0.159, hatW: 0.503, headCX: 0.469, eyeY: 0.359, eyeL: 0.363, eyeR: 0.556, neckY: 0.521, neckCX: 0.474, chestW: 0.300 },
-    cat_siam:       { skull: 0.162, hatW: 0.515, headCX: 0.444, eyeY: 0.360, eyeL: 0.350, eyeR: 0.560, neckY: 0.521, neckCX: 0.429, chestW: 0.300 },
-    cat_calico:     { skull: 0.174, hatW: 0.553, headCX: 0.453, eyeY: 0.390, eyeL: 0.350, eyeR: 0.570, neckY: 0.529, neckCX: 0.451, chestW: 0.420 },
-    cat_fold:       { skull: 0.176, hatW: 0.588, headCX: 0.459, eyeY: 0.396, eyeL: 0.346, eyeR: 0.571, neckY: 0.544, neckCX: 0.453, chestW: 0.430 },
-    cat_persian:    { skull: 0.179, hatW: 0.685, headCX: 0.449, eyeY: 0.400, eyeL: 0.420, eyeR: 0.580, neckY: 0.585, neckCX: 0.468, chestW: 0.600, fluff: 0.030 },
-    cat_black:      { skull: 0.162, hatW: 0.544, headCX: 0.457, eyeY: 0.362, eyeL: 0.334, eyeR: 0.574, neckY: 0.529, neckCX: 0.454, chestW: 0.410 },
-    dog_maltese:    { skull: 0.262, hatW: 0.618, headCX: 0.476, eyeY: 0.455, eyeL: 0.385, eyeR: 0.579, neckY: 0.591, neckCX: 0.487, chestW: 0.540, fluff: 0.022 },
-    dog_bichon:     { skull: 0.203, hatW: 0.665, headCX: 0.497, eyeY: 0.456, eyeL: 0.405, eyeR: 0.596, neckY: 0.591, neckCX: 0.499, chestW: 0.400, fluff: 0.036 },
-    dog_poodle:     { skull: 0.247, hatW: 0.503, headCX: 0.446, eyeY: 0.390, eyeL: 0.380, eyeR: 0.530, neckY: 0.559, neckCX: 0.462, chestW: 0.460 },
-    dog_corgi:      { skull: 0.191, hatW: 0.559, headCX: 0.479, eyeY: 0.425, eyeL: 0.381, eyeR: 0.566, neckY: 0.559, neckCX: 0.475, chestW: 0.440 },
-    dog_shiba:      { skull: 0.168, hatW: 0.426, headCX: 0.434, eyeY: 0.375, eyeL: 0.310, eyeR: 0.500, neckY: 0.544, neckCX: 0.426, chestW: 0.490 },
-    dog_retriever:  { skull: 0.126, hatW: 0.568, headCX: 0.404, eyeY: 0.285, eyeL: 0.350, eyeR: 0.450, neckY: 0.456, neckCX: 0.401, chestW: 0.450 },
-    dog_pomeranian: { skull: 0.288, hatW: 0.459, headCX: 0.426, eyeY: 0.475, eyeL: 0.370, eyeR: 0.500, neckY: 0.521, neckCX: 0.437, chestW: 0.530, fluff: 0.030 },
-    dog_dachshund:  { skull: 0.291, hatW: 0.600, headCX: 0.400, eyeY: 0.420, eyeL: 0.350, eyeR: 0.450, neckY: 0.600, neckCX: 0.403, chestW: 0.380 }
+    cat_cheese:     { skull: 0.171, hatW: 0.532, headCX: 0.463, eyeY: 0.404, eyeL: 0.350, eyeR: 0.577, neckY: 0.544, neckCX: 0.462, chestW: 0.310 },
+    cat_tuxedo:     { skull: 0.182, hatW: 0.500, headCX: 0.465, eyeY: 0.444, eyeL: 0.376, eyeR: 0.553, neckY: 0.535, neckCX: 0.465, chestW: 0.330 },
+    cat_blue:       { skull: 0.174, hatW: 0.447, headCX: 0.468, eyeY: 0.374, eyeL: 0.367, eyeR: 0.570, neckY: 0.521, neckCX: 0.474, chestW: 0.300 },
+    cat_siam:       { skull: 0.193, hatW: 0.456, headCX: 0.446, eyeY: 0.431, eyeL: 0.360, eyeR: 0.532, neckY: 0.521, neckCX: 0.429, chestW: 0.300 },
+    cat_calico:     { skull: 0.159, hatW: 0.544, headCX: 0.451, eyeY: 0.392, eyeL: 0.350, eyeR: 0.570, neckY: 0.529, neckCX: 0.451, chestW: 0.420 },
+    cat_fold:       { skull: 0.121, hatW: 0.579, headCX: 0.454, eyeY: 0.387, eyeL: 0.341, eyeR: 0.572, neckY: 0.544, neckCX: 0.453, chestW: 0.430 },
+    cat_persian:    { skull: 0.112, hatW: 0.647, headCX: 0.441, eyeY: 0.375, eyeL: 0.343, eyeR: 0.551, neckY: 0.585, neckCX: 0.468, chestW: 0.600, fluff: 0.026 },
+    cat_black:      { skull: 0.156, hatW: 0.538, headCX: 0.454, eyeY: 0.394, eyeL: 0.332, eyeR: 0.576, neckY: 0.529, neckCX: 0.454, chestW: 0.410 },
+    dog_maltese:    { skull: 0.132, hatW: 0.603, headCX: 0.484, eyeY: 0.477, eyeL: 0.385, eyeR: 0.579, neckY: 0.591, neckCX: 0.487, chestW: 0.540, fluff: 0.092 },
+    dog_bichon:     { skull: 0.112, hatW: 0.653, headCX: 0.500, eyeY: 0.456, eyeL: 0.404, eyeR: 0.595, neckY: 0.591, neckCX: 0.499, chestW: 0.400, fluff: 0.032 },
+    dog_poodle:     { skull: 0.082, hatW: 0.509, headCX: 0.451, eyeY: 0.411, eyeL: 0.368, eyeR: 0.524, neckY: 0.559, neckCX: 0.462, chestW: 0.460, fluff: 0.062 },
+    dog_corgi:      { skull: 0.241, hatW: 0.435, headCX: 0.479, eyeY: 0.428, eyeL: 0.381, eyeR: 0.566, neckY: 0.559, neckCX: 0.475, chestW: 0.440 },
+    dog_shiba:      { skull: 0.221, hatW: 0.432, headCX: 0.434, eyeY: 0.407, eyeL: 0.343, eyeR: 0.517, neckY: 0.544, neckCX: 0.426, chestW: 0.490 },
+    dog_retriever:  { skull: 0.076, hatW: 0.547, headCX: 0.406, eyeY: 0.282, eyeL: 0.316, eyeR: 0.493, neckY: 0.456, neckCX: 0.401, chestW: 0.450, fluff: 0.038 },
+    dog_pomeranian: { skull: 0.350, hatW: 0.518, headCX: 0.435, eyeY: 0.568, eyeL: 0.349, eyeR: 0.513, neckY: 0.521, neckCX: 0.437, chestW: 0.530, fluff: 0.055 },
+    dog_dachshund:  { skull: 0.240, hatW: 0.591, headCX: 0.401, eyeY: 0.435, eyeL: 0.307, eyeR: 0.497, neckY: 0.600, neckCX: 0.403, chestW: 0.380 }
   };
   /* 모자 그림의 실제 크기(100 상자) — w: 폭, bot: 밑동 y, cx: 가로 중심,
      fit: 머리 폭 대비 차지할 비율, sink: 정수리에 살짝 눌러 앉히는 정도 */
   var HAT_META = {
-    hat_paper:   { w: 91.8, bot: 100,  cx: 51.6, fit: 0.94, sink: 0.022, top: 30 },
-    hat_beret:   { w: 73.5, bot: 97.2, cx: 50.5, fit: 0.90, sink: 0.032, top: 43 },
-    hat_crown:   { w: 79.8, bot: 98.8, cx: 49.9, fit: 0.86, sink: 0.020, top: 22 },
-    hat_straw:   { w: 92,   bot: 93,   cx: 50,   fit: 1.50, sink: 0.030, top: 54 },
-    hat_cap:     { w: 60,   bot: 93,   cx: 50,   fit: 1.06, sink: 0.024, top: 61 },
-    hat_wizard:  { w: 84,   bot: 94,   cx: 50,   fit: 1.10, sink: 0.018, top: 4 },
-    hat_ribbon:  { w: 64,   bot: 91,   cx: 50,   fit: 1.06, sink: 0.020, top: 55 },
-    hat_chef:    { w: 62,   bot: 92,   cx: 50,   fit: 1.00, sink: 0.020, top: 34 },
-    hat_bunny:   { w: 56,   bot: 90,   cx: 50,   fit: 0.98, sink: 0.014, top: 22 },
+    hat_paper:   { w: 96.5, cx: 49.6, ay: 98.0, top: 26.9, fit: 0.98, sink: 0.024 },
+    hat_beret:   { w: 79.9, cx: 50.0, ay: 96.0, top: 39.5, fit: 0.96, sink: 0.026 },
+    hat_crown:   { w: 78.0, cx: 50.0, ay: 98.0, top: 21.6, fit: 0.82, sink: 0.028 },
+    hat_straw:   { w: 92.0, cx: 50.0, ay: 82.0, top: 55.0, fit: 1.30, sink: 0.018 },
+    hat_cap:     { w: 60.0, cx: 50.0, ay: 88.0, top: 59.2, fit: 1.05, sink: 0.022 },
+    hat_wizard:  { w: 84.0, cx: 50.0, ay: 88.0, top: 4.0,  fit: 1.10, sink: 0.016 },
+    hat_ribbon:  { w: 68.0, cx: 50.0, ay: 84.0, top: 70.0, fit: 1.00, sink: 0.022 },
+    hat_chef:    { w: 52.0, cx: 50.0, ay: 90.0, top: 34.0, fit: 1.06, sink: 0.024 },
+    hat_bunny:   { w: 60.0, cx: 50.0, ay: 84.0, top: 19.0, fit: 0.98, sink: 0.022 },
     /* 안경·선글라스: 눈 중심에 렌즈를 맞춘다 (lensGap: 그림에서 두 렌즈 중심 사이 거리) */
-    hat_glasses: { w: 100,  bot: 63.2, cx: 50,   lensGap: 50, lensY: 49.5, lensArtW: 30, minLens: 0.086 },
-    hat_round:   { w: 100,  bot: 63.2, cx: 50,   lensGap: 50, lensY: 49.5, lensArtW: 33, minLens: 0.095 },
-    hat_heart:   { w: 100,  bot: 63.2, cx: 50,   lensGap: 50, lensY: 49.5, lensArtW: 42, minLens: 0.108 },
-    hat_catseye: { w: 100,  bot: 63.2, cx: 50,   lensGap: 50, lensY: 49.5, lensArtW: 34, minLens: 0.096 },
-    hat_star:    { w: 100,  bot: 63.2, cx: 50,   lensGap: 50, lensY: 49.5, lensArtW: 40, minLens: 0.104 }
+    hat_glasses: { w: 100,  cx: 50, lensGap: 50, lensY: 49.5, lensArtW: 30, minLens: 0.086 },
+    hat_round:   { w: 100,  cx: 50, lensGap: 50, lensY: 49.5, lensArtW: 33, minLens: 0.095 },
+    hat_heart:   { w: 100,  cx: 50, lensGap: 50, lensY: 49.5, lensArtW: 42, minLens: 0.108 },
+    hat_catseye: { w: 100,  cx: 50, lensGap: 50, lensY: 49.5, lensArtW: 34, minLens: 0.096 },
+    hat_star:    { w: 100,  cx: 50, lensGap: 50, lensY: 49.5, lensArtW: 40, minLens: 0.104 }
   };
   /* 의상: 그림의 (50,0)이 목 중앙, 어깨 폭 52단위 기준.
      품종별 목선(PET_HEAD.neckY · neckCX · chestW)에 맞춰 목을 두르고 어깨를 감싼다.
@@ -4313,8 +4349,6 @@ var Room = (function () {
     var of = isLead && o.outfit ? OUTFIT_FIT[o.outfit] : null;
     var br = breedById(p.breed), kind = br ? br.kind : 'cat';
     var hd = PET_HEAD[p.breed] || PET_HEAD.cat_cheese;
-    /* 머리가 그림 가운데에서 조금 벗어난 품종이 있어 머리 중심을 따로 쓴다 */
-    var hx = cx + (hd.headCX - 0.5) * w;
     var s = '';
     if (of) {
       var bk = outfitArt(o.outfit, u, 'back');
@@ -4323,25 +4357,28 @@ var Room = (function () {
     s += '<image x="' + (cx - w / 2).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + w.toFixed(1) + '" preserveAspectRatio="xMidYMid meet" href="' + ASSET + breedImg(p.breed) + '"/>';
     if (of) s += outfitSvg(o.outfit, cx, y, w, of, u, kind, hd);
     if (isLead && o.hat && o.hat !== 'hat_none' && HAT_META[o.hat]) {
-      s += hatSvg(o.hat, hx, y, w, hd, u);
+      s += hatSvg(o.hat, cx, y, w, hd, u);
     }
     return s;
   }
 
   /* 모자 — 품종의 정수리·눈 좌표에 맞춰 크기·높이·좌우를 잡는다 */
-  function hatSvg(id, hx, boxTop, w, hd, u) {
+  function hatSvg(id, cx, boxTop, w, hd, u) {
     var m = HAT_META[id];
     if (!m) return '';
-    var k, ty, ax, ay;
+    var k, ty, ax, ay, hx;
     if (m.lensGap) {
-      /* 선글라스: 두 눈 중심 사이 거리에 렌즈 간격을 맞추고 렌즈 높이를 눈 높이에 둔다 */
+      /* 선글라스: 두 눈 중심 사이 거리에 렌즈 간격을 맞추고, 렌즈 중심을 눈 중심에 둔다 */
       k = Math.max((hd.eyeR - hd.eyeL) / m.lensGap, m.minLens / m.lensArtW);
       ty = boxTop + w * hd.eyeY;
+      hx = cx + (((hd.eyeL + hd.eyeR) / 2) - 0.5) * w;
       ax = m.cx; ay = m.lensY;
     } else {
+      /* 모자: 정수리에 밑동을 얹고 머리 중심(x)에 맞춘다 */
       k = (hd.hatW * m.fit) / m.w;
       ty = boxTop + w * (hd.skull + m.sink + (hd.fluff || 0));
-      ax = m.cx; ay = m.bot;
+      hx = cx + (hd.headCX - 0.5) * w;
+      ax = m.cx; ay = (m.ay == null ? m.bot : m.ay);
     }
     return '<g transform="translate(' + hx.toFixed(1) + ',' + ty.toFixed(1) + ') scale(' + (w * k).toFixed(3) +
            ') translate(' + (-ax) + ',' + (-ay) + ')">' + art(id, u) + '</g>';
@@ -4364,7 +4401,7 @@ var Room = (function () {
     var m = HAT_META[o.hat];
     if (!m || m.top == null || m.lensGap || !hd) return 0;
     var k = (hd.hatW * m.fit) / m.w;
-    return Math.max(0, ((m.bot - m.top) * k - (hd.skull + m.sink + (hd.fluff || 0))) * w + 0.6);
+    return Math.max(0, (((m.ay == null ? m.bot : m.ay) - m.top) * k - (hd.skull + m.sink + (hd.fluff || 0))) * w + 0.6);
   }
 
   function outfitSvg(id, cx, y, w, of, u, kind, hd, layer) {
