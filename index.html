@@ -601,41 +601,42 @@ body{
   .pet{ animation:none !important; }
 }
 
-/* ================= 미구입 아이템 미리보기 · 자물쇠 잠금 (크게) ================= */
+/* ================= 미구입 아이템 미리보기 · 자물쇠 잠금 (속이 비치는 큰 자물쇠) ================= */
 .stage-lock{
   position:absolute; inset:0; z-index:3; display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:6px; padding:8px;
+  /* 아주 연한 딤만 — 미리보기 중인 방·반려동물·의상이 또렷이 보이도록 */
   background:
-    radial-gradient(92% 90% at 50% 46%, rgba(5,7,16,.08) 0%, rgba(5,7,16,.32) 58%, rgba(5,7,16,.62) 100%),
-    repeating-linear-gradient(135deg, rgba(255,255,255,.05) 0 8px, rgba(255,255,255,0) 8px 22px);
+    radial-gradient(92% 90% at 50% 46%, rgba(10,12,20,.18) 0%, rgba(10,12,20,.20) 58%, rgba(10,12,20,.25) 100%),
+    repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 8px, rgba(255,255,255,0) 8px 22px);
   animation:lkIn .18s ease-out both;
 }
 .stage-lock[hidden]{ display:none; }
 @keyframes lkIn{ from{ opacity:0 } to{ opacity:1 } }
 @keyframes lkPop{ from{ opacity:0; transform:scale(.72) } to{ opacity:1; transform:none } }
-/* 미리보기 중에는 방 그림을 흐릿·어둡게 — 실루엣만 살짝 비친다 */
-.stage-art.pv{ filter:blur(2.2px) brightness(.92) saturate(.8); transform:scale(1.03); }
+/* 미리보기 중에도 방 그림은 그대로 선명하게 — 잠금 표시는 연한 딤과 사선 패턴으로만 */
 .lk-veil{ display:flex; flex-direction:column; align-items:center; gap:9px; color:#fff; }
+/* 불투명 원형 배경판 없이, 자물쇠 모양 자체만 반투명하게 띄운다 */
 .lk-medal{
-  width:clamp(118px, 36vw, 156px); aspect-ratio:1/1; border-radius:50%; display:grid; place-items:center;
-  background:radial-gradient(circle at 50% 38%, rgba(255,228,160,.20), rgba(16,18,36,.5) 58%, rgba(8,10,20,.72) 100%);
-  border:1.5px solid rgba(255,220,145,.55);
-  box-shadow:0 16px 36px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.26),
-             0 0 0 9px rgba(255,214,120,.07), 0 0 30px rgba(255,206,108,.26);
-  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  width:auto; aspect-ratio:auto; border-radius:0; display:grid; place-items:center;
+  background:none; border:0; box-shadow:none;
+  backdrop-filter:none; -webkit-backdrop-filter:none;
   animation:lkPop .34s cubic-bezier(.22,1.3,.4,1) both;
 }
 .stage-lock .lk-big{
-  width:66%; height:66%; color:#ffe6a8;
-  filter:drop-shadow(0 2px 0 rgba(78,50,0,.35)) drop-shadow(0 0 15px rgba(255,206,102,.6)) drop-shadow(0 12px 22px rgba(0,0,0,.7));
+  width:clamp(84px, 26vw, 100px); height:clamp(84px, 26vw, 100px); color:#ffe6a8;
+  opacity:.52;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.55)) drop-shadow(0 0 13px rgba(255,206,102,.38));
 }
+/* 배지는 캐릭터·옷을 가리지 않도록 방 화면 하단에 붙인다 */
 .lk-cap{
+  position:absolute; left:50%; bottom:11px; transform:translateX(-50%);
   display:inline-flex; align-items:center; gap:5px;
-  font-size:12.5px; font-weight:900; letter-spacing:-.35px; padding:7px 15px; border-radius:999px;
-  background:linear-gradient(180deg, rgba(48,36,20,.94), rgba(15,13,26,.94));
-  border:1px solid rgba(255,214,120,.6); color:#ffe9b8;
-  box-shadow:0 10px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.18);
-  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  font-size:11.5px; font-weight:850; letter-spacing:-.3px; padding:6px 13px; border-radius:999px;
+  background:linear-gradient(180deg, rgba(38,30,20,.82), rgba(15,13,26,.84));
+  border:1px solid rgba(255,214,120,.45); color:#ffe9b8;
+  box-shadow:0 6px 14px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.14);
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
   white-space:nowrap;
 }
 .lk-bar{
