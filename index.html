@@ -4757,7 +4757,7 @@ var Room = (function () {
       s += '<div class="sec-h">🐱 고양이 <span>8품종</span></div><div class="grid breeds">' + cats.map(breedCard).join('') + '</div>';
       s += '<div class="sec-h">🐶 강아지 <span>8품종</span></div><div class="grid breeds">' + dogs.map(breedCard).join('') + '</div>';
     } else if (curTab === 'room') {
-      s += '<p class="room-hint">살았던 방은 언제든 눌러서 <b>무료로 돌아갈</b> 수 있어요. 아직 못 가 본 방은 눌러서 미리 보기 → <b>이사하기</b> 버튼으로 결제해요.</p>';
+      s += '<p class="room-hint">살았던 방은 언제든 눌러서 <b>무료로 돌아갈</b> 수 있어요. 아직 못 가 본 방은 눌러서 미리 보기 → <b>이사하기</b> 버튼으로 결제해요. 레벨이 모자라면 <b>Lv.XX 해금</b>으로 표시되고, 레벨을 올린 뒤에 이사할 수 있어요.</p>';
       RG.forEach(function (g) {
         var cur = RS.grade === g.n, unlocked = RS.maxGrade >= g.n, next = g.n === RS.maxGrade + 1;
         var lvLock = !unlocked && gradeLocked(g), reqLv = gradeReqLv(g);
