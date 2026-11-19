@@ -34,13 +34,13 @@ body{
     radial-gradient(75% 55% at 50% 108%, rgba(128,64,224,.28), rgba(128,64,224,0) 72%),
     radial-gradient(130% 95% at 50% 42%, #1b2458 0%, #121a45 42%, #0a0e2b 76%, #05081a 100%);
 }
-/* 배경의 은은한 빛무리 */
+/* 배경의 은은한 빛무리 — blend 대신 배경 그라디언트에 직접 얹는다
+   (iOS Safari 는 화면 전체 mix-blend-mode 레이어를 매 프레임 다시 합성한다) */
 #app::before{
   content:""; position:absolute; inset:0; pointer-events:none;
   background:
-    radial-gradient(38% 26% at 50% 30%, rgba(122,150,255,.16), rgba(122,150,255,0) 70%),
-    radial-gradient(46% 30% at 50% 74%, rgba(150,90,255,.12), rgba(150,90,255,0) 70%);
-  mix-blend-mode:screen;
+    radial-gradient(38% 26% at 50% 30%, rgba(122,150,255,.10), rgba(122,150,255,0) 70%),
+    radial-gradient(46% 30% at 50% 74%, rgba(150,90,255,.08), rgba(150,90,255,0) 70%);
 }
 
 /* ================= 상단 HUD ================= */
@@ -93,7 +93,7 @@ body{
   background:
     repeating-linear-gradient(90deg, rgba(0,0,0,.05) 0 7px, rgba(255,255,255,.055) 7px 14px),
     linear-gradient(180deg, #ddb377 0%, #c8934f 26%, #9d6c36 64%, #7b4f24 100%);
-  box-shadow:0 9px 20px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,239,206,.6), inset 0 -1px 0 rgba(0,0,0,.35);
+  box-shadow:0 7px 13px rgba(0,0,0,.44), inset 0 1px 0 rgba(255,239,206,.6), inset 0 -1px 0 rgba(0,0,0,.35);
 }
 .plank::after{
   content:""; position:absolute; left:1px; right:1px; top:100%; height:4px;
@@ -108,10 +108,14 @@ body{
   position:relative; width:var(--bw);
   --slot:calc(var(--bw) * .80);
   display:flex; flex-direction:column; align-items:center;
-  transform-origin:50% 100%; will-change:transform;
-  transition:transform .14s cubic-bezier(.18,.9,.28,1), filter .2s ease;
+  transform-origin:50% 100%;
+  transition:transform .14s cubic-bezier(.18,.9,.28,1);
   cursor:pointer;
 }
+/* 25병 전부를 늘 합성 레이어로 띄우지 않는다 — 실제로 기울거나 골라진 병만 */
+.bottle.pouring, .bottle.return, .bottle.selected{ will-change:transform; }
+/* 병의 '제자리' 상자를 잴 때만 transform·transition 을 무력화 */
+.bottle.measuring{ transform:none !important; transition:none !important; }
 .bottle.tall{ width:calc(var(--bw) * .90); --slot:var(--tall-slot, calc(var(--bw) * .70)); }
 
 /* 목 */
@@ -133,7 +137,7 @@ body{
 
 /* 몸통(유리) */
 .body{
-  position:relative; width:100%; overflow:hidden;
+  position:relative; width:100%; overflow:hidden; contain:paint;
   height:calc(var(--slot) * var(--cap));
   border-radius:22% 22% 28% 28% / 9% 9% 13% 13%;
   background:
@@ -141,9 +145,9 @@ body{
     linear-gradient(180deg, rgba(150,182,255,.13), rgba(96,126,224,.05) 45%, rgba(46,66,150,.10));
   box-shadow:
     inset 0 0 0 1px rgba(255,255,255,.22),
-    inset 0 -10px 16px rgba(0,0,0,.22),
-    inset 0 8px 12px rgba(255,255,255,.06),
-    0 6px 16px rgba(0,0,0,.34);
+    inset 0 -10px 14px rgba(0,0,0,.22),
+    inset 0 8px 10px rgba(255,255,255,.06),
+    0 5px 12px rgba(0,0,0,.32);
   transition:box-shadow .28s ease;
 }
 .bottle.tall .body{ border-radius:18% 18% 22% 22% / 4% 4% 6% 6%; }
@@ -154,6 +158,7 @@ body{
 .band{
   position:absolute; left:1.5px; right:1.5px; z-index:1;
   background-color:var(--c);
+  contain:layout paint;
   background-image:
     linear-gradient(90deg,
       rgba(0,0,0,.24) 0%, rgba(255,255,255,.18) 12%, rgba(255,255,255,.05) 32%,
@@ -161,7 +166,8 @@ body{
     linear-gradient(180deg, rgba(255,255,255,.075) 0%, rgba(255,255,255,.012) 24%, rgba(0,0,0,.06) 100%);
   background-repeat:no-repeat;
   transition:height .13s cubic-bezier(.3,0,.2,1), bottom .13s cubic-bezier(.3,0,.2,1);
-  will-change:height;
+  /* will-change:height 는 합성 대상이 아닌 속성이라 병마다 레이어만 늘리고
+     매 프레임 다시 래스터라이즈된다 — 걷어낸다 (iOS Safari 프레임 드랍의 주범) */
 }
 /* 액체 내부의 옅은 빛줄기 (모든 밴드 같은 위치 → 세로로 이어져 보임) */
 .band::after{
@@ -173,8 +179,12 @@ body{
 .band.top::before{
   content:""; position:absolute; left:0; right:0; top:0; height:8px; z-index:2;
   background:radial-gradient(54% 130% at 50% 100%, rgba(255,255,255,.50), rgba(255,255,255,.12) 62%, rgba(255,255,255,0) 100%);
-  animation:surfaceWave 3.6s ease-in-out infinite;
   pointer-events:none;
+}
+/* 표면 출렁임은 '지금 손대는 병'에서만 — 평상시 24병이 동시에 무한 애니메이션을
+   돌리면 iOS 컴포지터가 계속 일한다. 선택된 병 하나만 가볍게 움직인다. */
+.bottle.selected .band.top::before{
+  animation:surfaceWave 3.6s ease-in-out infinite;
 }
 .band .meniscus{ display:none; }
 .band.top .meniscus{
@@ -188,8 +198,8 @@ body{
   0%,100%{ transform:translateY(0) scaleX(1); opacity:.9 }
   50%{ transform:translateY(.55px) scaleX(1.035); opacity:1 }
 }
-/* 표면이 출렁이는 순간 */
-.band.ripple::before{ animation:surfaceWave 3.6s ease-in-out infinite, surfaceSplash .28s ease-out 1; }
+/* 표면이 출렁이는 순간 — 한 번만 도는 짧은 애니메이션 */
+.band.ripple::before{ animation:surfaceSplash .28s ease-out 1; }
 @keyframes surfaceSplash{
   0%{ transform:translateY(-2px) scaleX(.94) }
   55%{ transform:translateY(.8px) scaleX(1.06) }
@@ -201,7 +211,7 @@ body{
   background:linear-gradient(90deg,
     rgba(255,255,255,.26) 0%, rgba(255,255,255,.08) 3%, rgba(255,255,255,0) 11%,
     rgba(255,255,255,0) 68%, rgba(255,255,255,.10) 80%, rgba(255,255,255,.24) 97%, rgba(255,255,255,.06) 100%);
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.26), inset 0 6px 8px rgba(255,255,255,.07), inset 0 -12px 18px rgba(0,0,0,.16);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.26), inset 0 -10px 13px rgba(0,0,0,.16);
 }
 .tick{
   position:absolute; inset:0; z-index:3; display:flex; align-items:center; justify-content:center;
@@ -275,15 +285,18 @@ body{
 
 /* 물줄기 — 병 입구에서 목표 병까지 부드러운 곡선으로 이어지는 유체 */
 .stream-layer{ position:fixed; inset:0; z-index:55; pointer-events:none; }
-.pour-fx{ position:fixed; overflow:visible; pointer-events:none; }
+.pour-fx{
+  position:fixed; overflow:visible; pointer-events:none;
+  /* 자라나는 연출은 SVG 한 겹에만 건다 — 패스마다 clip-path 를 걸면
+     iOS 는 매 프레임 그 패스를 다시 래스터라이즈한다. */
+  animation:streamGrow .24s cubic-bezier(.32,.04,.42,1) forwards;
+}
 .pour-fx path{ stroke-linecap:round; }
 .pour-fx .flow{
   stroke-dasharray:var(--len); stroke-dashoffset:var(--len);
   animation:streamFlow .24s cubic-bezier(.32,.04,.42,1) forwards;
 }
-.pour-fx .shape{
-  animation:streamGrow .24s cubic-bezier(.32,.04,.42,1) forwards;
-}
+
 @keyframes streamGrow{
   0%{ clip-path:inset(0 0 100% 0); opacity:0 }
   22%{ opacity:1 }
@@ -331,8 +344,10 @@ body{
 /* ================= 클리어 ================= */
 .overlay{
   position:fixed; inset:0; z-index:80; display:grid; place-items:center;
-  background:radial-gradient(60% 50% at 50% 45%, rgba(60,80,190,.35), rgba(4,6,18,.78));
-  backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px);
+  /* 뒤 화면은 클리어 순간 이후 멈춰 있으므로(상시 애니메이션 제거) 흐림은 한 번만 계산된다.
+     반지름은 7px → 4px 로 줄여 비용을 낮게 유지. */
+  background:radial-gradient(62% 52% at 50% 44%, rgba(58,76,186,.42), rgba(6,9,24,.90) 74%);
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
 }
 .overlay.hidden{ display:none; }
 .card{
@@ -450,7 +465,7 @@ body{
   position:absolute; left:9px; bottom:9px; display:inline-flex; align-items:center; gap:4px;
   padding:4px 9px; border-radius:999px; font-size:10.5px; font-weight:800; letter-spacing:-.2px;
   background:rgba(10,12,26,.55); border:1px solid rgba(255,255,255,.18); color:#eaf0ff;
-  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); pointer-events:none;
+  pointer-events:none;
 }
 
 /* 탭 */
@@ -586,7 +601,7 @@ body{
   position:absolute; right:9px; bottom:9px; display:inline-flex; align-items:center; gap:3px;
   padding:4px 9px; border-radius:999px; font-size:10.5px; font-weight:800; letter-spacing:-.2px;
   background:rgba(10,12,26,.55); border:1px solid rgba(255,255,255,.18); color:#eaf0ff;
-  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); pointer-events:none;
+  pointer-events:none;
 }
 .stage-empty{
   position:absolute; inset:0; display:grid; place-content:center; justify-items:center; gap:9px; text-align:center;
@@ -677,10 +692,9 @@ body{
   position:absolute; left:50%; bottom:11px; transform:translateX(-50%);
   display:inline-flex; align-items:center; gap:5px;
   font-size:11.5px; font-weight:850; letter-spacing:-.3px; padding:6px 13px; border-radius:999px;
-  background:linear-gradient(180deg, rgba(38,30,20,.82), rgba(15,13,26,.84));
+  background:linear-gradient(180deg, rgba(38,30,20,.90), rgba(15,13,26,.92));
   border:1px solid rgba(255,214,120,.45); color:#ffe9b8;
   box-shadow:0 6px 14px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.14);
-  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
   white-space:nowrap;
 }
 .lk-bar{
@@ -1309,6 +1323,7 @@ var Sound = (function () {
   var armed = false;
   var busNode = null, busCtx = null;          /* 마스터 게인 → 컴프레서 */
   var pourVoices = 0, pourAt = 0;             /* 220ms 동시 붓기: 겹침 조절용 */
+  var silentBuf = null;                       /* iOS 잠금 해제용 1샘플 무음 버퍼 (한 번만 생성) */
 
   function raw() {
     if (!ctx) {
@@ -1327,9 +1342,9 @@ var Sound = (function () {
         var pr = c.resume();
         if (pr && pr.catch) pr.catch(function () {});
       }
-      var b = c.createBuffer(1, 1, 22050);
       var s = c.createBufferSource();
-      s.buffer = b;
+      if (!silentBuf) { silentBuf = c.createBuffer(1, 1, 22050); }
+      s.buffer = silentBuf;
       s.connect(c.destination);
       if (s.start) s.start(0); else if (s.noteOn) s.noteOn(0);
     } catch (e) {}
@@ -1605,7 +1620,10 @@ var Sound = (function () {
   fetchPour();                                /* 페이지가 뜨면 파일만 먼저 받아 둔다 */
 
   return {
-    unlock: function () { var c = raw(); if (!c) return false; kick(c); return c.state === 'running'; },
+    unlock: function () {
+      if (ctx && ctx.state === 'running') return true;   /* 이미 열렸으면 탭마다 손대지 않는다 */
+      var c = raw(); if (!c) return false; kick(c); return c.state === 'running';
+    },
     rearm: function () { arm(); if (ctx && ctx.state !== 'running') kick(ctx); },
     isMuted: function () { return muted; },
     isRunning: function () { return !!ctx && ctx.state === 'running'; },
@@ -1706,6 +1724,8 @@ var game = {
   gen: 0            // 판이 바뀌거나 되돌리면 +1 — 진행 중인 붓기 연출을 무효화하는 세대 번호
 };
 
+var btnUndoEl = $('#btnUndo');
+function setText(el, v) { if (el && el.textContent !== v) el.textContent = v; }
 function setStatus(text) {
   if (elStatus.textContent !== text) elStatus.textContent = text;
 }
@@ -1718,6 +1738,8 @@ function makeBottleEl(bottle) {
   el.style.setProperty('--cap', String(bottle.cap));
   el.innerHTML = '<div class="neck"></div><div class="cap"></div><div class="body"><span class="shine"></span></div><div class="tick">✓</div>';
   bottle.el = el;
+  bottle.bodyEl = el.querySelector('.body');
+  bottle.shineEl = bottle.bodyEl.querySelector('.shine');
   bottle.bands = new Map();
   return el;
 }
@@ -1736,8 +1758,8 @@ function liquidRuns(cells) {
 function syncBottle(bottle, animate) {
   var el = bottle.el;
   if (!el) return;
-  var body = el.querySelector('.body');
-  var shine = body.querySelector('.shine');
+  var body = bottle.bodyEl || (bottle.bodyEl = el.querySelector('.body'));
+  var shine = bottle.shineEl || (bottle.shineEl = body.querySelector('.shine'));
   var slot = 100 / bottle.cap;
   var runs = liquidRuns(bottle.cells);
   var bands = bottle.bands;
@@ -1755,13 +1777,23 @@ function syncBottle(bottle, animate) {
       band.dataset.color = String(run.color);
       band.style.setProperty('--c', COLORS[run.color]);
       band.style.bottom = (run.i * slot) + '%';
-      band.style.height = animate ? '0%' : h;
+      band.style.height = h;
       band.innerHTML = '<span class="meniscus"></span>';
       body.insertBefore(band, shine);
       bands.set(run.i, band);
       if (animate) {
-        void band.offsetHeight;          // 0%에서 시작하도록 강제 리플로우
-        band.style.height = h;
+        /* 강제 리플로우(void band.offsetHeight) 대신 Web Animations 로 0%에서 차오른다 —
+           매번 레이아웃을 즉시 다시 계산하지 않는다. */
+        if (band.animate) {
+          try {
+            band.animate([{ height: '0%' }, { height: h }],
+              { duration: 140, easing: 'cubic-bezier(.3,0,.2,1)' });
+          } catch (e) {}
+        } else {
+          band.style.height = '0%';
+          void band.offsetHeight;
+          band.style.height = h;
+        }
       }
     } else {
       band.style.bottom = (run.i * slot) + '%';
@@ -1808,6 +1840,7 @@ function renderAll(animate) {
 /* 선반 배치: 좌우 선반에 일반 병을 단(tier)별로 나눠 놓고, 가운데에 긴 병 */
 function buildLayout() {
   colLeft.innerHTML = ''; colCenter.innerHTML = ''; colRight.innerHTML = '';
+  invalidateRects();
 
   var normals = game.bottles.filter(function (b) { return !b.tall; });
   var tall = game.bottles.filter(function (b) { return b.tall; })[0] || null;
@@ -1852,16 +1885,17 @@ function buildLayout() {
 }
 
 function updateHud() {
-  elLv.textContent = String(game.level);
-  elMove.textContent = String(game.moves);
-  elDone.textContent = String(countSettled(game.bottles));
-  elTotal.textContent = String(game.cfg ? game.cfg.units : 0);
-  $('#btnUndo').style.opacity = game.history.length ? '1' : '.45';
+  setText(elLv, String(game.level));
+  setText(elMove, String(game.moves));
+  setText(elDone, String(countSettled(game.bottles)));
+  setText(elTotal, String(game.cfg ? game.cfg.units : 0));
+  var op = game.history.length ? '1' : '.45';
+  if (btnUndoEl.style.opacity !== op) btnUndoEl.style.opacity = op;
   /* 가운데 목표 병 진행도 (0/8 · 0/12 · 0/16) */
   if (game.goalCountEl) {
     var tall = null;
     game.bottles.forEach(function (b) { if (b.tall) tall = b; });
-    game.goalCountEl.textContent = (tall ? tall.cells.length : 0) + '/' + (tall ? tall.cap : 8);
+    setText(game.goalCountEl, (tall ? tall.cells.length : 0) + '/' + (tall ? tall.cap : 8));
   }
 }
 
@@ -2006,6 +2040,7 @@ function fitStage(force) {
   }
 
   game.bottles.forEach(function (b) { b.restRect = null; });
+  invalidateRects();
 }
 
 /* =====================================================================
@@ -2035,25 +2070,37 @@ function shakeEl(el) {
   setTimeout(function () { el.classList.remove('shake'); }, 300);
 }
 
-/* 병의 '제자리' 위치 — 붓느라 기울어 있어도 원래 상자를 잰다 */
-function restRect(el) {
-  var cls = el.className;
-  var t = el.style.transform, tr = el.style.transition;
-  var tilted = el.classList.contains('pouring') || el.classList.contains('return');
-  if (tilted) el.classList.remove('pouring', 'return');
-  el.style.transition = 'none';
-  el.style.transform = 'none';
-  var r = el.getBoundingClientRect();
-  el.style.transform = t;
-  el.style.transition = tr;
-  if (tilted) el.className = cls;                       // 같은 프레임 안에서 원래 상태로 복구
-  return r;
+/* 병의 '제자리' 상자를 한 번에 모아 캐시한다(붓느라 기울어 있어도 원래 상자를 잰다).
+   예전에는 붓을 때마다 병마다 클래스를 넣었다 뺐다 하며 getBoundingClientRect 를
+   불렀는데 — 연타하면 ①클래스 토글로 스타일이 더러워지고 ②픽셀 강제 재계산(layout)
+   이 매번 일어나 메인 스레드가 프레임 예산을 넘겼다. 이제 배치가 바뀔 때만 모아 잰다. */
+var layoutGen = 0, rectGen = -1;
+function measureRects() {
+  if (rectGen === layoutGen) return;
+  var list = [];
+  game.bottles.forEach(function (b) {
+    if (!b.el || !b.el.isConnected) return;
+    b.el.classList.add('measuring');                    // 쓰기 단계
+    list.push(b);
+  });
+  for (var i = 0; i < list.length; i++) list[i].restRect = list[i].el.getBoundingClientRect();   // 읽기 단계
+  for (var j = 0; j < list.length; j++) list[j].el.classList.remove('measuring');
+  rectGen = layoutGen;
 }
+function bottleRestRect(b) {
+  if (!b || !b.el || !b.el.isConnected) return null;
+  measureRects();
+  if (!b.restRect) { b.el.classList.add('measuring'); b.restRect = b.el.getBoundingClientRect(); b.el.classList.remove('measuring'); }
+  return b.restRect;
+}
+function invalidateRects() { layoutGen++; }
 
 /* 병을 상대 병 위로 기울임 (입구가 상대 병 입구에 오도록 계산) */
-function tiltTowards(srcEl, dstEl) {
-  var a = restRect(srcEl);
-  var b = dstEl.getBoundingClientRect();
+function tiltTowards(from, to) {
+  var srcEl = from.el, dstEl = to.el;
+  var a = bottleRestRect(from);
+  var b = bottleRestRect(to);
+  if (!a || !b) return null;
   var dir = (b.left + b.width / 2) >= (a.left + a.width / 2) ? 1 : -1;
   var isTall = srcEl.classList.contains('tall');
   var deg = dir * (isTall ? 10 : 30);
@@ -2091,7 +2138,6 @@ function untilt(el) {
 }
 
 var svgNS = 'http://www.w3.org/2000/svg';
-var streamSeq = 0;
 function svgNode(tag, attrs) {
   var n = document.createElementNS(svgNS, tag);
   for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
@@ -2128,7 +2174,6 @@ function showStream(pt, colorIdx) {
           c2x.toFixed(1) + ' ' + c2y.toFixed(1) + ' ' +
           x1.toFixed(1) + ' ' + y1.toFixed(1);
 
-  var id = 'pf' + (++streamSeq);
   var svg = svgNode('svg', {
     'class': 'pour-fx', width: Math.ceil(w), height: Math.ceil(h),
     viewBox: '0 0 ' + Math.ceil(w) + ' ' + Math.ceil(h)
@@ -2136,14 +2181,8 @@ function showStream(pt, colorIdx) {
   svg.style.left = left.toFixed(0) + 'px';
   svg.style.top = top.toFixed(0) + 'px';
 
-  var defs = svgNode('defs', {});
-  var filt = svgNode('filter', { id: id + 'b', x: '-60%', y: '-60%', width: '220%', height: '220%' });
-  filt.appendChild(svgNode('feGaussianBlur', { stdDeviation: '2.4' }));
-  defs.appendChild(filt);
-  svg.appendChild(defs);
-
   /* 물줄기 모양: 위는 가늘고 아래로 갈수록 조금 굵어지는 유체 리본 */
-  var N = 16, pts = [], i, t;
+  var N = 12, pts = [], i, t;
   for (i = 0; i <= N; i++) {
     t = i / N;
     var mt = 1 - t;
@@ -2175,8 +2214,12 @@ function showStream(pt, colorIdx) {
   for (i = 0; i < back.length; i++) body += ' L' + back[i].x.toFixed(1) + ' ' + back[i].y.toFixed(1);
   body += ' Z';
 
-  var halo = svgNode('path', { d: body, fill: col, opacity: '.30' });
-  halo.setAttribute('filter', 'url(#' + id + 'b)');
+  /* 바깥 번짐 — 예전에는 feGaussianBlur 필터를 썼는데, iOS Safari 는 SVG 필터를
+     매 프레임 CPU 로 다시 그리고 캐시도 하지 않는다. 필터 대신 같은 모양을
+     조금 넓고 옅은 선(stroke)으로 한 겹 깔아 번짐을 낸다 — 보기는 거의 같고 비용은 거의 0. */
+  var halo = svgNode('path', { d: body, fill: col, opacity: '.18', stroke: col, 'stroke-width': '2.2' });
+  halo.setAttribute('stroke-linejoin', 'round');
+  halo.setAttribute('stroke-linecap', 'round');
   halo.setAttribute('class', 'shape');
   var core = svgNode('path', { d: body, fill: col, opacity: '.78' });
   core.setAttribute('class', 'shape');
@@ -2186,12 +2229,16 @@ function showStream(pt, colorIdx) {
   svg.appendChild(halo); svg.appendChild(core); svg.appendChild(glint);
 
   streamLayer.appendChild(svg);
-  /* 연타로 연출이 쌓이지 않게 오래된 것부터 정리 */
-  while (streamLayer.childElementCount > 18) streamLayer.removeChild(streamLayer.firstElementChild);
+  /* 연타로 연출이 쌓이지 않게 오래된 것부터 정리 (물줄기 최대 12개) */
+  while (streamLayer.childElementCount > 12) streamLayer.removeChild(streamLayer.firstElementChild);
 
   /* 줄기가 위에서 흐르듯 — 모양은 클립으로 위에서부터 드러내고, 빛줄기는 dash 로 흘린다 */
-  var len = glint.getTotalLength ? glint.getTotalLength() : dist;
-  svg.style.setProperty('--len', len.toFixed(1));
+  var len = 0;
+  for (i = 1; i < pts.length; i++) {
+    var lx = pts[i].x - pts[i - 1].x, ly = pts[i].y - pts[i - 1].y;
+    len += Math.sqrt(lx * lx + ly * ly);
+  }
+  svg.style.setProperty('--len', (len || dist).toFixed(1));
 
   /* 떨어진 자리: 물빛이 번지는 잔물결 (튀는 점 같은 입자는 쓰지 않는다) */
   var fx = [];
@@ -2241,7 +2288,8 @@ function animatePour(from, to, color) {
   if (from.animT1) { clearTimeout(from.animT1); from.animT1 = 0; }
   if (from.animT2) { clearTimeout(from.animT2); from.animT2 = 0; }
 
-  var pt = tiltTowards(el, to.el);
+  var pt = tiltTowards(from, to);
+  if (!pt) return;
   showStream(pt, color);
 
   from.animT1 = setTimeout(function () {
@@ -2421,10 +2469,11 @@ function startLevel(level, seed) {
    ===================================================================== */
 /* 화면 좌표 → 그 자리에 '원래' 있는 병 (붓느라 기울어 자리를 벗어나도 놓치지 않게) */
 function bottleAtPoint(x, y) {
+  measureRects();
   for (var i = 0; i < game.bottles.length; i++) {
     var b = game.bottles[i];
-    if (!b.el || !b.el.isConnected) continue;
-    var r = b.restRect || (b.restRect = restRect(b.el));
+    if (!b.el || !b.el.isConnected || !b.restRect) continue;
+    var r = b.restRect;
     if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return i;
   }
   return -1;
@@ -2481,10 +2530,22 @@ document.addEventListener('visibilitychange', function () {
 window.addEventListener('pageshow', function () { Sound.rearm(); });
 window.addEventListener('focus', function () { Sound.rearm(); });
 
-var resizeTimer = 0;
+var resizeTimer = 0, lastVW = 0, lastVH = 0;
+/* iOS Safari 는 손가락으로 화면을 조금만 밀어도 visualViewport scroll 이 쏟아진다.
+   그때마다 무대를 다시 재고 그리면(병 25개 재생성) 게임이 뚝 끊긴다 —
+   실제로 보이는 크기가 바뀐 경우에만 다시 그린다. */
 function onResize() {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(function () { fitStage(); }, 120);
+  resizeTimer = setTimeout(function () {
+    var vh = viewHeight(), vw = window.innerWidth || 0;
+    if (!lastVH) { lastVW = vw; lastVH = vh; fitStage(); return; }
+    if (Math.abs(vh - lastVH) < 2 && Math.abs(vw - lastVW) < 2) {
+      invalidateRects();            /* 크기는 그대로여도 화면이 살짝 밀렸을 수 있다 — 병 좌표만 새로 잰다 */
+      return;
+    }
+    lastVW = vw; lastVH = vh;
+    fitStage();
+  }, 120);
 }
 window.addEventListener('resize', onResize);
 window.addEventListener('orientationchange', onResize);
