@@ -183,13 +183,11 @@ body{
     rgba(255,255,255,0) 0%, rgba(255,255,255,.62) 18%, rgba(255,255,255,.82) 48%,
     rgba(255,255,255,.40) 76%, rgba(255,255,255,0) 100%);
   border-radius:50% / 100%;
-  animation:surfaceGlow 5.4s ease-in-out infinite;
 }
 @keyframes surfaceWave{
   0%,100%{ transform:translateY(0) scaleX(1); opacity:.9 }
   50%{ transform:translateY(.55px) scaleX(1.035); opacity:1 }
 }
-@keyframes surfaceGlow{ 0%,100%{ opacity:.5 } 50%{ opacity:.85 } }
 /* 표면이 출렁이는 순간 */
 .band.ripple::before{ animation:surfaceWave 3.6s ease-in-out infinite, surfaceSplash .28s ease-out 1; }
 @keyframes surfaceSplash{
