@@ -148,23 +148,54 @@ body{
 }
 .bottle.tall .body{ border-radius:18% 18% 22% 22% / 4% 4% 6% 6%; }
 
-/* 액체 */
+/* 액체 — 매끈한 유체.
+   같은 색이 이어지는 구간은 syncBottle 이 하나의 밴드로 합쳐 그리므로
+   층 경계선이 보이지 않고, 좌우 원통 음영은 모든 밴드에 똑같이 깔려 세로로 이어진다. */
 .band{
   position:absolute; left:1.5px; right:1.5px; z-index:1;
   background-color:var(--c);
+  background-image:
+    linear-gradient(90deg,
+      rgba(0,0,0,.24) 0%, rgba(255,255,255,.18) 12%, rgba(255,255,255,.05) 32%,
+      rgba(0,0,0,.0) 56%, rgba(0,0,0,.13) 80%, rgba(0,0,0,.27) 100%),
+    linear-gradient(180deg, rgba(255,255,255,.075) 0%, rgba(255,255,255,.012) 24%, rgba(0,0,0,.06) 100%);
+  background-repeat:no-repeat;
   transition:height .13s cubic-bezier(.3,0,.2,1), bottom .13s cubic-bezier(.3,0,.2,1);
   will-change:height;
 }
+/* 액체 내부의 옅은 빛줄기 (모든 밴드 같은 위치 → 세로로 이어져 보임) */
 .band::after{
-  content:""; position:absolute; inset:0;
-  background:
-    linear-gradient(90deg, rgba(0,0,0,.26) 0%, rgba(255,255,255,.20) 14%, rgba(255,255,255,.03) 38%, rgba(0,0,0,.06) 68%, rgba(0,0,0,.30) 100%),
-    linear-gradient(180deg, rgba(255,255,255,.055), rgba(0,0,0,.05));
+  content:""; position:absolute; left:12%; top:0; bottom:0; width:30%;
+  background:linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.10) 45%, rgba(255,255,255,0));
+  pointer-events:none;
 }
+/* 액체 표면 — 유리처럼 빛나는 얇은 수면 */
 .band.top::before{
-  content:""; position:absolute; left:0; right:0; top:-1px; height:4px; z-index:2;
-  background:linear-gradient(180deg, rgba(255,255,255,.38), rgba(255,255,255,0));
-  border-radius:50%;
+  content:""; position:absolute; left:0; right:0; top:0; height:8px; z-index:2;
+  background:radial-gradient(54% 130% at 50% 100%, rgba(255,255,255,.50), rgba(255,255,255,.12) 62%, rgba(255,255,255,0) 100%);
+  animation:surfaceWave 3.6s ease-in-out infinite;
+  pointer-events:none;
+}
+.band .meniscus{ display:none; }
+.band.top .meniscus{
+  display:block; position:absolute; left:0; right:0; top:0; height:2px; z-index:3; pointer-events:none;
+  background:linear-gradient(90deg,
+    rgba(255,255,255,0) 0%, rgba(255,255,255,.62) 18%, rgba(255,255,255,.82) 48%,
+    rgba(255,255,255,.40) 76%, rgba(255,255,255,0) 100%);
+  border-radius:50% / 100%;
+  animation:surfaceGlow 5.4s ease-in-out infinite;
+}
+@keyframes surfaceWave{
+  0%,100%{ transform:translateY(0) scaleX(1); opacity:.9 }
+  50%{ transform:translateY(.55px) scaleX(1.035); opacity:1 }
+}
+@keyframes surfaceGlow{ 0%,100%{ opacity:.5 } 50%{ opacity:.85 } }
+/* 표면이 출렁이는 순간 */
+.band.ripple::before{ animation:surfaceWave 3.6s ease-in-out infinite, surfaceSplash .28s ease-out 1; }
+@keyframes surfaceSplash{
+  0%{ transform:translateY(-2px) scaleX(.94) }
+  55%{ transform:translateY(.8px) scaleX(1.06) }
+  100%{ transform:translateY(0) scaleX(1) }
 }
 /* 유리 광택 */
 .shine{
@@ -244,28 +275,43 @@ body{
 }
 .bottle.shake{ animation:shakeX .26s ease; }
 
-/* 물줄기 */
+/* 물줄기 — 병 입구에서 목표 병까지 부드러운 곡선으로 이어지는 유체 */
 .stream-layer{ position:fixed; inset:0; z-index:55; pointer-events:none; }
-.stream-wrap{ position:fixed; width:0; height:0; transform-origin:top center; }
-.stream{
-  position:relative; width:5px; margin-left:-2.5px; height:calc(var(--bw) * 1.5);
-  border-radius:3px; transform-origin:top center;
-  background:linear-gradient(180deg, var(--c) 0%, var(--c) 72%, transparent 100%);
-  filter:drop-shadow(0 0 5px rgba(255,255,255,.3));
-  animation:streamDrop .22s cubic-bezier(.2,.6,.4,1) forwards;
+.pour-fx{ position:fixed; overflow:visible; pointer-events:none; }
+.pour-fx path{ stroke-linecap:round; }
+.pour-fx .flow{
+  stroke-dasharray:var(--len); stroke-dashoffset:var(--len);
+  animation:streamFlow .24s cubic-bezier(.32,.04,.42,1) forwards;
 }
-@keyframes streamDrop{
-  0%{ transform:scaleY(.15); opacity:0 }
-  25%{ opacity:.95 }
-  70%{ opacity:.9 }
-  100%{ transform:scaleY(1); opacity:0 }
+.pour-fx .shape{
+  animation:streamGrow .24s cubic-bezier(.32,.04,.42,1) forwards;
 }
-.splash{
-  position:fixed; width:16px; height:16px; margin:-8px 0 0 -8px; border-radius:50%;
-  border:2px solid rgba(255,255,255,.75); animation:splashOut .24s ease-out forwards;
+@keyframes streamGrow{
+  0%{ clip-path:inset(0 0 100% 0); opacity:0 }
+  22%{ opacity:1 }
+  74%{ clip-path:inset(0 0 0 0); opacity:1 }
+  100%{ clip-path:inset(0 0 0 0); opacity:0 }
 }
-@keyframes splashOut{
-  0%{ transform:scale(.3); opacity:.9 } 100%{ transform:scale(1.7); opacity:0 }
+@keyframes streamFlow{
+  0%{ stroke-dashoffset:var(--len); opacity:0 }
+  18%{ opacity:1 }
+  72%{ stroke-dashoffset:0; opacity:1 }
+  100%{ stroke-dashoffset:0; opacity:0 }
+}
+/* 떨어진 자리의 잔물결 — 링 하나 + 물빛 번짐 하나 */
+.ripple{
+  position:fixed; width:22px; height:10px; margin:-5px 0 0 -11px; border-radius:50%;
+  background:radial-gradient(50% 50% at 50% 50%, rgba(255,255,255,.46), rgba(255,255,255,.14) 52%, rgba(255,255,255,0) 78%);
+  animation:rippleOut .30s cubic-bezier(.2,.6,.3,1) forwards;
+}
+.ripple.b{
+  width:14px; height:7px; margin:-3.5px 0 0 -7px; background:none;
+  border:1px solid rgba(255,255,255,.30);
+  animation:rippleOut .34s cubic-bezier(.2,.6,.3,1) .04s forwards;
+}
+@keyframes rippleOut{
+  0%{ transform:scale(.28); opacity:.9 }
+  100%{ transform:scale(1.9); opacity:0 }
 }
 
 /* ============ 보조 줄 (상태 문구 + 다시하기/새 판) — 무대 위, HUD 아래 ============ */
@@ -1263,6 +1309,8 @@ var Sound = (function () {
   var ctx = null;
   var muted = store('wsp.muted') === '1';
   var armed = false;
+  var busNode = null, busCtx = null;          /* 마스터 게인 → 컴프레서 */
+  var pourVoices = 0, pourAt = 0;             /* 220ms 동시 붓기: 겹침 조절용 */
 
   function raw() {
     if (!ctx) {
@@ -1303,6 +1351,22 @@ var Sound = (function () {
     });
   }
 
+  /* 모든 소리는 마스터 게인 → 컴프레서를 지나간다 — 여러 병을 연달아 부어도 찢어지지 않는다 */
+  function out(c) {
+    if (busCtx === c && busNode) return busNode;
+    var g = c.createGain(), comp = null;
+    try {
+      g.gain.value = 0.9;
+      comp = c.createDynamicsCompressor();
+      comp.threshold.value = -20; comp.knee.value = 14; comp.ratio.value = 6;
+      comp.attack.value = 0.003; comp.release.value = 0.20;
+    } catch (e) { comp = null; }
+    if (comp) { g.connect(comp); comp.connect(c.destination); }
+    else { try { g.connect(c.destination); } catch (e2) {} }
+    busNode = g; busCtx = c;
+    return g;
+  }
+
   function tone(freq, opt) {
     opt = opt || {};
     if (muted) return;
@@ -1316,26 +1380,153 @@ var Sound = (function () {
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g); g.connect(c.destination);
+    o.connect(g); g.connect(out(c));
     o.start(t0); o.stop(t0 + dur + 0.04);
   }
 
-  function splash(dur, vol) {
-    if (muted) return;
-    var c = ac(); if (!c) return;
-    dur = dur || 0.30;
-    var n = Math.floor(c.sampleRate * dur);
+  /* 잡음 버퍼: 감쇠 곡선을 골라 쓸 수 있다 */
+  function noiseBuf(c, dur, decay) {
+    var n = Math.max(1, Math.floor(c.sampleRate * dur));
     var buf = c.createBuffer(1, n, c.sampleRate);
     var d = buf.getChannelData(0);
     for (var i = 0; i < n; i++) {
       var t = i / n;
-      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 3) * (0.55 + 0.45 * Math.sin(2 * Math.PI * 26 * t));
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay || 3);
     }
-    var src = c.createBufferSource(); src.buffer = buf;
-    var f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1500;
-    var g = c.createGain(); g.gain.value = vol || 0.05;
-    src.connect(f); f.connect(g); g.connect(c.destination);
-    src.start();
+    return buf;
+  }
+
+  /* 여과된 짧은 잡음 — 물소리·마개 마찰의 바탕 */
+  function noiseHit(c, opt) {
+    var t0 = c.currentTime + (opt.delay || 0);
+    var src = c.createBufferSource();
+    src.buffer = noiseBuf(c, opt.dur || 0.2, opt.decay || 3);
+    var f = c.createBiquadFilter();
+    f.type = opt.type || 'bandpass';
+    f.frequency.setValueAtTime(opt.freq || 900, t0);
+    if (opt.to) f.frequency.exponentialRampToValueAtTime(Math.max(80, opt.to), t0 + (opt.dur || 0.2));
+    if (opt.q) f.Q.value = opt.q;
+    var g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(opt.vol || 0.05, t0 + (opt.attack || 0.012));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + (opt.dur || 0.2));
+    src.connect(f); f.connect(g); g.connect(out(c));
+    src.start(t0); src.stop(t0 + (opt.dur || 0.2) + 0.05);
+    return { src: src, filter: f, gain: g, t0: t0 };
+  }
+
+  /* 쪼르륵 — 흘러내리는 물줄기(여과 잡음 + 느린 물결) 와 방울 소리(짧은 상승 글라이드) */
+  function pourBody(c, lvl, at) {
+    at = at || 0;
+    var t0 = c.currentTime + at;
+    var dur = 0.245;
+    var src = c.createBufferSource();
+    src.buffer = noiseBuf(c, dur, 1.6);
+    var bp = c.createBiquadFilter();
+    bp.type = 'bandpass'; bp.Q.value = 1.7;
+    bp.frequency.setValueAtTime(1050, t0);
+    bp.frequency.exponentialRampToValueAtTime(560, t0 + dur);
+    var lp = c.createBiquadFilter();          /* 세찬 '쉬익'을 깎아 물소리 답게 */
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(2800, t0);
+
+    /* 물줄기가 흔들리는 결 — 이 트레몰로가 '쏴아'가 아니라 '쪼르륵'으로 들리게 한다 */
+    var trem = c.createGain();
+    trem.gain.value = 0.55;
+    var lfo = c.createOscillator(); lfo.type = 'sine'; lfo.frequency.setValueAtTime(19, t0);
+    var depth = c.createGain(); depth.gain.value = 0.45;
+    lfo.connect(depth); depth.connect(trem.gain);
+
+    var env = c.createGain();
+    env.gain.setValueAtTime(0.0001, t0);
+    env.gain.exponentialRampToValueAtTime(0.30 * lvl, t0 + 0.022);
+    env.gain.exponentialRampToValueAtTime(0.12 * lvl, t0 + 0.16);
+    env.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.245);
+
+    src.connect(bp); bp.connect(lp); lp.connect(trem); trem.connect(env); env.connect(out(c));
+    lfo.start(t0); lfo.stop(t0 + dur + 0.02);
+    src.start(t0); src.stop(t0 + dur + 0.02);
+
+    /* 물방울이 톡톡 올라오는 소리 */
+    var bubbles = 3 + Math.floor(Math.random() * 3);
+    for (var i = 0; i < bubbles; i++) {
+      var f0 = 420 + Math.random() * 520;
+      tone(f0, {
+        dur: 0.045 + Math.random() * 0.03,
+        type: 'sine',
+        vol: (0.05 + Math.random() * 0.022) * lvl,
+        to: f0 * (1.5 + Math.random() * 0.5),
+        delay: at + 0.02 + Math.random() * 0.15
+      });
+    }
+    /* 병 속에서 올라오는 낮은 '꾸룩' */
+    tone(205, { dur: 0.13, type: 'sine', vol: 0.07 * lvl, to: 150, delay: at + 0.035 });
+    /* 표면에 닿는 순간의 가벼운 틱 */
+    tone(1320, { dur: 0.05, type: 'triangle', vol: 0.06 * lvl, to: 980, delay: at + 0.012 });
+  }
+
+  function pourLevel() {
+    var now = Date.now();
+    var gap = now - pourAt;
+    pourAt = now;
+    var conc = pourVoices;
+    pourVoices++;
+    setTimeout(function () { pourVoices = Math.max(0, pourVoices - 1); }, 260);
+    if (conc >= 4) return 0;            /* 너무 많이 겹치면 몸통음은 생략 */
+    if (conc === 0) return 1;
+    if (conc === 1) return 0.8;
+    if (conc === 2) return 0.6;
+    return 0.42;
+  }
+
+  /* 코르크 마개가 닫히는 소리 — 나무가 닿는 짧은 마찰 + 톡 하고 내려앉는 몸통 + 뽕 */
+  function corkSound(c) {
+    var t0 = c.currentTime + 0.008;
+    /* 마개 마찰 */
+    noiseHit(c, { dur: 0.04, decay: 2, vol: 0.075, freq: 2300, to: 1500, q: 0.9, type: 'bandpass', delay: 0.008 });
+    /* 톡 — 낮게 떨어지는 나무 몸통 */
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(250, t0);
+    o.frequency.exponentialRampToValueAtTime(112, t0 + 0.11);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.36, t0 + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.16);
+    o.connect(g); g.connect(out(c));
+    o.start(t0); o.stop(t0 + 0.2);
+    /* 뽕 — 밝은 클릭 */
+    tone(760, { dur: 0.06, type: 'triangle', vol: 0.10, to: 520, delay: 0.006 });
+    /* 기분 좋은 마무리 반짝임 */
+    tone(1046, { dur: 0.16, type: 'sine', vol: 0.05, delay: 0.055 });
+    tone(1568, { dur: 0.20, type: 'sine', vol: 0.035, delay: 0.10 });
+  }
+
+  /* 테스트용 믹스 렌더: 같은 소리를 gap 간격으로 count번 겹쳤을 때 파형이 찢어지는지 */
+  function renderOffline(seconds) {
+    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OAC) return null;
+    return new OAC(1, Math.ceil(44100 * seconds), 44100);
+  }
+  function stats(buf, name) {
+    var d = buf.getChannelData(0), peak = 0, sum = 0, nz = 0, first = -1, last = -1;
+    for (var i = 0; i < d.length; i++) {
+      var v = Math.abs(d[i]);
+      if (v > peak) peak = v;
+      sum += v * v;
+      if (v > 0.002) { nz++; if (first < 0) first = i; last = i; }
+    }
+    return {
+      name: name, peak: Math.round(peak * 1000) / 1000,
+      rms: Math.round(Math.sqrt(sum / d.length) * 10000) / 10000,
+      clipped: peak >= 0.999, sounding: nz,
+      ms: first < 0 ? 0 : Math.round((last - first) / 44.1)
+    };
+  }
+  function pcmBase64(buf) {
+    var d = buf.getChannelData(0), out = new Int16Array(d.length), s = '';
+    for (var i = 0; i < d.length; i++) out[i] = Math.max(-1, Math.min(1, d[i])) * 32767;
+    var bytes = new Uint8Array(out.buffer);
+    for (var j = 0; j < bytes.length; j++) s += String.fromCharCode(bytes[j]);
+    return btoa(s);
   }
 
   arm();
@@ -1352,10 +1543,19 @@ var Sound = (function () {
       return muted;
     },
     pick: function () { tone(720, { dur: 0.08, type: 'triangle', vol: 0.05, to: 980 }); },
+    /* 병에서 병으로 따를 때 — '쪼르륵' */
     pour: function () {
-      tone(440, { dur: 0.19, type: 'sine', vol: 0.05, to: 300 });
-      splash(0.32, 0.055);
-      tone(300, { dur: 0.13, type: 'sine', vol: 0.035, to: 400, delay: 0.07 });
+      if (muted) return;
+      var c = ac(); if (!c) return;
+      var lvl = pourLevel();
+      if (!lvl) return;                  /* 네 병 이상이 겹치는 순간엔 조용히 넘긴다 */
+      pourBody(c, lvl);
+    },
+    /* 병이 다 차서 코르크 마개로 닫힐 때 — '톡/뽕' */
+    cork: function () {
+      if (muted) return;
+      var c = ac(); if (!c) return;
+      corkSound(c);
     },
     fail: function () { tone(150, { dur: 0.13, type: 'square', vol: 0.03, to: 100 }); },
     done: function () {
@@ -1365,7 +1565,46 @@ var Sound = (function () {
       [523, 659, 784, 1046, 1318].forEach(function (f, i) {
         tone(f, { dur: 0.34, type: 'triangle', vol: 0.055, delay: i * 0.09 });
       });
-    }
+    },
+    /* 검증용: 같은 소리를 오프라인 컨텍스트에서 렌더해 파형을 재본다 */
+    probe: function (name, dur, wantAudio) {
+      var oac = renderOffline(dur || 0.8);
+      if (!oac || typeof this[name] !== 'function') return null;
+      var prevCtx = ctx, prevMuted = muted, prevBusNode = busNode, prevBusCtx = busCtx, prevVoices = pourVoices;
+      ctx = oac; busNode = null; busCtx = null; muted = false; pourVoices = 0;
+      try { this[name](); } catch (e) {
+        ctx = prevCtx; busNode = prevBusNode; busCtx = prevBusCtx; muted = prevMuted; pourVoices = prevVoices;
+        return { error: String(e) };
+      }
+      ctx = prevCtx; busNode = prevBusNode; busCtx = prevBusCtx; muted = prevMuted; pourVoices = prevVoices;
+      return oac.startRendering().then(function (buf) {
+        var st = stats(buf, name);
+        if (wantAudio) st.pcm = pcmBase64(buf);
+        return st;
+      });
+    },
+    /* 검증용: 같은 소리를 여러 번 겹쳐(S동시 붓기) 찢어지는지 재본다 */
+    probeMix: function (name, count, gap, dur, wantAudio) {
+      var oac = renderOffline(dur || 1.0);
+      if (!oac) return null;
+      var prevCtx = ctx, prevBusNode = busNode, prevBusCtx = busCtx;
+      ctx = oac; busNode = null; busCtx = null;
+      try {
+        for (var i = 0; i < (count || 1); i++) {
+          if (name === 'pour') pourBody(oac, 1, i * (gap || 0.03));
+          else if (name === 'cork') corkSound(oac);
+        }
+      } catch (e) {
+        ctx = prevCtx; busNode = prevBusNode; busCtx = prevBusCtx;
+        return { error: String(e) };
+      }
+      ctx = prevCtx; busNode = prevBusNode; busCtx = prevBusCtx;
+      return oac.startRendering().then(function (buf) {
+        var st = stats(buf, name + 'x' + count);
+        if (wantAudio) st.pcm = pcmBase64(buf);
+        return st;
+      });
+    },
   };
 })();
 
@@ -1403,52 +1642,75 @@ function makeBottleEl(bottle) {
   return el;
 }
 
-/* 액체 칸 맞추기 */
+/* 액체 칸 맞추기 — 같은 색이 이어지는 칸은 하나의 밴드로 합쳐 그린다(이음매 없음) */
+function liquidRuns(cells) {
+  var runs = [], i, last;
+  for (i = 0; i < cells.length; i++) {
+    last = runs[runs.length - 1];
+    if (last && last.color === cells[i]) last.n++;
+    else runs.push({ color: cells[i], i: i, n: 1 });
+  }
+  return runs;
+}
+
 function syncBottle(bottle, animate) {
   var el = bottle.el;
   if (!el) return;
   var body = el.querySelector('.body');
   var shine = body.querySelector('.shine');
   var slot = 100 / bottle.cap;
+  var runs = liquidRuns(bottle.cells);
   var bands = bottle.bands;
-  var i, c, band;
+  var keep = {};
 
-  for (i = 0; i < bottle.cells.length; i++) {
-    c = bottle.cells[i];
-    band = bands.get(i);
-    if (band && band.dataset.color !== String(c)) { band.remove(); bands.delete(i); band = null; }
+  runs.forEach(function (run) {
+    keep[run.i] = 1;
+    var band = bands.get(run.i);
+    var h = (run.n * slot) + '%';
+    if (band && band.dataset.color !== String(run.color)) { band.remove(); bands.delete(run.i); band = null; }
 
     if (!band) {
       band = document.createElement('i');
       band.className = 'band';
-      band.dataset.color = String(c);
-      band.style.setProperty('--c', COLORS[c]);
-      band.style.bottom = (i * slot) + '%';
-      band.style.height = animate ? '0%' : slot + '%';
+      band.dataset.color = String(run.color);
+      band.style.setProperty('--c', COLORS[run.color]);
+      band.style.bottom = (run.i * slot) + '%';
+      band.style.height = animate ? '0%' : h;
+      band.innerHTML = '<span class="meniscus"></span>';
       body.insertBefore(band, shine);
-      bands.set(i, band);
+      bands.set(run.i, band);
       if (animate) {
         void band.offsetHeight;          // 0%에서 시작하도록 강제 리플로우
-        band.style.height = slot + '%';
+        band.style.height = h;
       }
     } else {
-      band.style.bottom = (i * slot) + '%';
-      band.style.height = slot + '%';
-    }
-  }
-
-  Array.from(bands.keys()).forEach(function (idx) {
-    if (idx >= bottle.cells.length) {
-      var b = bands.get(idx);
-      bands.delete(idx);
-      b.classList.remove('top');
-      b.style.height = '0%';
-      if (animate) setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 220);
-      else if (b.parentNode) b.parentNode.removeChild(b);
+      band.style.bottom = (run.i * slot) + '%';
+      band.style.height = h;
     }
   });
 
-  bands.forEach(function (b, idx) { b.classList.toggle('top', idx === bottle.cells.length - 1); });
+  Array.from(bands.keys()).forEach(function (idx) {
+    if (keep[idx]) return;
+    var b = bands.get(idx);
+    bands.delete(idx);
+    b.classList.remove('top');
+    b.style.height = '0%';
+    if (animate) setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 220);
+    else if (b.parentNode) b.parentNode.removeChild(b);
+  });
+
+  var topIdx = runs.length ? runs[runs.length - 1].i : -1;
+  bands.forEach(function (b, idx) {
+    var isTop = idx === topIdx;
+    var wasTop = b.classList.contains('top');
+    b.classList.toggle('top', isTop);
+    if (isTop && !wasTop && animate) {          // 표면이 올라온 순간 살짝 출렁
+      b.classList.remove('ripple');
+      void b.offsetHeight;
+      b.classList.add('ripple');
+      setTimeout(function () { b.classList.remove('ripple'); }, 320);
+    }
+  });
   var full = isComplete(bottle);
   el.classList.toggle('done', full);
   el.classList.toggle('capped', full);      /* 완성 = 뚜껑 닫힘 */
@@ -1720,7 +1982,7 @@ function tiltTowards(srcEl, dstEl) {
   var lipX = a.left + a.width / 2 + Math.sin(th) * arm;
   var lipY = a.top + a.height - Math.cos(th) * arm;
   var targetX = b.left + b.width / 2 + dir * 3;
-  var targetY = b.top - 7;
+  var targetY = b.top - 15;        /* 목구멍 위로 살짝 띄워 물줄기가 보이게 */
   var tx, ty;
   if (isTall) {
     /* 긴 병은 크게 휘둘리지 않게 제자리에서만 살짝 기울인다 (물줄기가 목표까지 이어진다) */
@@ -1748,38 +2010,122 @@ function untilt(el) {
   el.style.transform = '';
 }
 
-function showStream(pt, colorIdx) {
-  var wrap = document.createElement('div');
-  wrap.className = 'stream-wrap';
-  var s = document.createElement('div');
-  s.className = 'stream';
-  s.style.setProperty('--c', COLORS[colorIdx]);
+var svgNS = 'http://www.w3.org/2000/svg';
+var streamSeq = 0;
+function svgNode(tag, attrs) {
+  var n = document.createElementNS(svgNS, tag);
+  for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
+  return n;
+}
 
+/* 병 입구에서 목표 병 입구로 흘러내리는 매끈한 물줄기 */
+function showStream(pt, colorIdx) {
   var from = pt.from || pt;
+  var col = COLORS[colorIdx];
   var dx = pt.x - from.x, dy = pt.y - from.y;
   var dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist > 10) {                       // 병 입구에서 목표까지 이어지는 물줄기
-    wrap.style.left = from.x + 'px';
-    wrap.style.top = from.y + 'px';
-    wrap.style.transform = 'rotate(' + (Math.atan2(-dx, dy) * 180 / Math.PI).toFixed(1) + 'deg)';
-    s.style.height = dist.toFixed(1) + 'px';
-  } else {
-    wrap.style.left = pt.x + 'px';
-    wrap.style.top = pt.y + 'px';
+  if (dist < 14) {                    /* 거의 붙어 있어도 짧은 물줄기는 보이게 */
+    pt = { x: from.x + dx * 0.4, y: from.y + 20 };
+    dx = pt.x - from.x; dy = pt.y - from.y; dist = Math.sqrt(dx * dx + dy * dy);
   }
-  wrap.appendChild(s);
-  streamLayer.appendChild(wrap);
+  /* 병 입구 바로 밖부터 그리면 목 밖으로 툭 튀어나와 보인다 — 살짝 안에서 시작 */
+  var trim = Math.min(9, dist * 0.35);
+  from = { x: from.x + dx / dist * trim, y: from.y + dy / dist * trim };
+  dx = pt.x - from.x; dy = pt.y - from.y; dist = Math.sqrt(dx * dx + dy * dy);
 
-  var ring = document.createElement('div');
-  ring.className = 'splash';
-  ring.style.left = pt.x + 'px';
-  ring.style.top = (pt.y + 12) + 'px';
-  streamLayer.appendChild(ring);
+  var pad = 20;
+  var left = Math.min(from.x, pt.x) - pad;
+  var top = Math.min(from.y, pt.y) - pad;
+  var w = Math.abs(dx) + pad * 2 + 4;
+  var h = Math.abs(dy) + pad * 2 + 14;
+  var x0 = from.x - left, y0 = from.y - top, x1 = pt.x - left, y1 = pt.y + 9 - top;   /* 목구멍 안까지 */
+
+  /* 입구에서 살짝 흘러내린 뒤 목표 쪽으로 떨어지는 곡선 */
+  var c1x = x0 + dx * 0.05, c1y = y0 + dy * 0.52;
+  var c2x = x0 + dx * 0.58, c2y = y1 - Math.abs(dy) * 0.09;
+  var d = 'M' + x0.toFixed(1) + ' ' + y0.toFixed(1) +
+          ' C' + c1x.toFixed(1) + ' ' + c1y.toFixed(1) + ' ' +
+          c2x.toFixed(1) + ' ' + c2y.toFixed(1) + ' ' +
+          x1.toFixed(1) + ' ' + y1.toFixed(1);
+
+  var id = 'pf' + (++streamSeq);
+  var svg = svgNode('svg', {
+    'class': 'pour-fx', width: Math.ceil(w), height: Math.ceil(h),
+    viewBox: '0 0 ' + Math.ceil(w) + ' ' + Math.ceil(h)
+  });
+  svg.style.left = left.toFixed(0) + 'px';
+  svg.style.top = top.toFixed(0) + 'px';
+
+  var defs = svgNode('defs', {});
+  var filt = svgNode('filter', { id: id + 'b', x: '-60%', y: '-60%', width: '220%', height: '220%' });
+  filt.appendChild(svgNode('feGaussianBlur', { stdDeviation: '2.4' }));
+  defs.appendChild(filt);
+  svg.appendChild(defs);
+
+  /* 물줄기 모양: 위는 가늘고 아래로 갈수록 조금 굵어지는 유체 리본 */
+  var N = 16, pts = [], i, t;
+  for (i = 0; i <= N; i++) {
+    t = i / N;
+    var mt = 1 - t;
+    pts.push({
+      x: mt * mt * mt * x0 + 3 * mt * mt * t * c1x + 3 * mt * t * t * c2x + t * t * t * x1,
+      y: mt * mt * mt * y0 + 3 * mt * mt * t * c1y + 3 * mt * t * t * c2y + t * t * t * y1
+    });
+  }
+  var wA = 3.2, wB = 6.2, edge = [];
+  for (i = 0; i <= N; i++) {
+    var prev = pts[Math.max(0, i - 1)], next = pts[Math.min(N, i + 1)];
+    var tx = next.x - prev.x, ty = next.y - prev.y;
+    var tl = Math.sqrt(tx * tx + ty * ty) || 1;
+    var nx = -ty / tl, ny = tx / tl;
+    var hw = (wA + (wB - wA) * (i / N)) / 2;
+    edge.push({ x: pts[i].x + nx * hw, y: pts[i].y + ny * hw });
+  }
+  var back = [];
+  for (i = N; i >= 0; i--) {
+    var pv = pts[Math.max(0, i - 1)], nx2 = pts[Math.min(N, i + 1)];
+    var tx2 = nx2.x - pv.x, ty2 = nx2.y - pv.y;
+    var tl2 = Math.sqrt(tx2 * tx2 + ty2 * ty2) || 1;
+    var nxx = -ty2 / tl2, nyy = tx2 / tl2;
+    var hw2 = (wA + (wB - wA) * (i / N)) / 2;
+    back.push({ x: pts[i].x - nxx * hw2, y: pts[i].y - nyy * hw2 });
+  }
+  var body = 'M' + edge[0].x.toFixed(1) + ' ' + edge[0].y.toFixed(1);
+  for (i = 1; i <= N; i++) body += ' L' + edge[i].x.toFixed(1) + ' ' + edge[i].y.toFixed(1);
+  for (i = 0; i < back.length; i++) body += ' L' + back[i].x.toFixed(1) + ' ' + back[i].y.toFixed(1);
+  body += ' Z';
+
+  var halo = svgNode('path', { d: body, fill: col, opacity: '.30' });
+  halo.setAttribute('filter', 'url(#' + id + 'b)');
+  halo.setAttribute('class', 'shape');
+  var core = svgNode('path', { d: body, fill: col, opacity: '.78' });
+  core.setAttribute('class', 'shape');
+  /* 물줄기 한가운데로 흐르는 빛 */
+  var glint = svgNode('path', { d: d, stroke: '#ffffff', 'stroke-width': '1.2', opacity: '.55', 'stroke-linecap': 'round', fill: 'none' });
+  glint.setAttribute('class', 'flow');
+  svg.appendChild(halo); svg.appendChild(core); svg.appendChild(glint);
+
+  streamLayer.appendChild(svg);
+  /* 연타로 연출이 쌓이지 않게 오래된 것부터 정리 */
+  while (streamLayer.childElementCount > 18) streamLayer.removeChild(streamLayer.firstElementChild);
+
+  /* 줄기가 위에서 흐르듯 — 모양은 클립으로 위에서부터 드러내고, 빛줄기는 dash 로 흘린다 */
+  var len = glint.getTotalLength ? glint.getTotalLength() : dist;
+  svg.style.setProperty('--len', len.toFixed(1));
+
+  /* 떨어진 자리: 물빛이 번지는 잔물결 (튀는 점 같은 입자는 쓰지 않는다) */
+  var fx = [];
+  var r1 = document.createElement('div'); r1.className = 'ripple';
+  r1.style.left = pt.x + 'px'; r1.style.top = (pt.y + 13) + 'px';
+  streamLayer.appendChild(r1); fx.push(r1);
+  var r2 = document.createElement('div'); r2.className = 'ripple b';
+  r2.style.left = pt.x + 'px'; r2.style.top = (pt.y + 13) + 'px';
+  streamLayer.appendChild(r2); fx.push(r2);
 
   setTimeout(function () {
-    if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
-    if (ring.parentNode) ring.parentNode.removeChild(ring);
-  }, 260);
+    if (svg.parentNode) svg.parentNode.removeChild(svg);
+    fx.forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); });
+  }, 420);
 }
 
 /* =====================================================================
@@ -1849,7 +2195,10 @@ function doPour(fromId, toId, amount) {
   Sound.pour();
   animatePour(from, to, color);
 
-  if (isComplete(to)) setTimeout(function () { Sound.done(); }, 150);
+  if (isComplete(to)) {
+    var genCork = game.gen;
+    setTimeout(function () { if (game.gen === genCork) Sound.cork(); }, 140);   /* 뚜껑이 닫히는 순간 */
+  }
 
   if (isWin(game.bottles)) { onWin(); return; }
   if (isComplete(to)) {
