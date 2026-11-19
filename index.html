@@ -1293,7 +1293,7 @@ function splitRows(count, rows) {
 /* @@CORE-END */
 
 /* =====================================================================
-   2. 사운드 (Web Audio API — 외부 파일 없음)
+   2. 사운드 (Web Audio API — 붓는 소리만 실제 녹음 assets/pour.mp3)
    ===================================================================== */
 function store(key, value) {
   try {
@@ -1333,6 +1333,7 @@ var Sound = (function () {
       s.connect(c.destination);
       if (s.start) s.start(0); else if (s.noteOn) s.noteOn(0);
     } catch (e) {}
+    if (!pourBuf) decodePour();               /* 오디오가 열린 첫 제스처에서 바로 디코딩 */
   }
   function ac() {
     var c = raw(); if (!c) return null;
@@ -1472,6 +1473,83 @@ var Sound = (function () {
     return 0.42;
   }
 
+  /* ==================================================================
+     물 따르는 소리 — 합성 대신 실제 녹음(assets/pour.mp3)을 쓴다.
+     · 페이지가 뜨면 파일만 먼저 내려받아 둔다(fetch는 제스처 없이도 된다).
+     · 디코딩은 오디오 컨텍스트가 생긴 뒤에 한다 — iOS는 제스처 밖에서 만든
+       컨텍스트를 계속 잠가 두므로, 첫 터치의 kick() 안에서 ctx를 만들고 그때 디코딩한다.
+     · 파일: assets/pour.mp3 (0.40s, 44.1kHz 모노) — 실패하면 assets/pour.wav로 한 번 더.
+       원본은 Freesound 414077 'Water To Glass' (Black_River_Phonogram, CC0 1.0).
+     ================================================================== */
+  var pourBytes = null, pourBuf = null, pourFetching = null, pourDecoding = false;
+  var pourDead = false, pourTries = 0;
+  var pourVol = 0.07;                         /* 녹음 피크 0.89 · RMS 0.137 기준 음량 */
+
+  function fetchPour() {
+    if (pourBytes || pourFetching || pourDead) return pourFetching;
+    if (typeof fetch !== 'function') { pourDead = true; return null; }
+    var urls = ['assets/pour.mp3', 'assets/pour.wav'], i = 0;
+    function attempt() {
+      if (i >= urls.length) {                   /* 두 파일 다 실패 — 몇 번 더 해 보고 포기 */
+        if (++pourTries >= 2) pourDead = true;
+        return null;
+      }
+      return fetch(urls[i++]).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.arrayBuffer();
+      }).catch(attempt);
+    }
+    pourFetching = Promise.resolve().then(attempt).then(function (ab) {
+      pourFetching = null;
+      if (!ab) return null;
+      pourBytes = ab;
+      decodePour();                            /* 이미 오디오가 열려 있으면 여기서 바로 */
+      return ab;
+    }).catch(function () { pourFetching = null; return null; });
+    return pourFetching;
+  }
+
+  function decodePour() {
+    if (pourBuf || !pourBytes || pourDecoding) return;
+    var c = ctx;                               /* 이미 열린 컨텍스트가 있을 때만 (iOS: 제스처 밖 생성 금지) */
+    if (!c) return;                            /* 아직 오디오가 없으면 첫 터치 뒤로 미룬다 */
+    var ab = pourBytes;
+    pourDecoding = true;
+    function ok(buf) { pourDecoding = false; if (buf && !pourBuf) pourBuf = buf; }
+    function bad() {                           /* 오디오가 통째로 망가진 경우만 재시도 */
+      pourDecoding = false;
+      pourBytes = null;
+      if (++pourTries >= 3) pourDead = true;
+    }
+    try {
+      var p = c.decodeAudioData(ab, ok, bad);  /* 구형 Safari: 콜백 방식 */
+      if (p && p.then) p.then(ok, bad);        /* 최신 브라우저: 프로미스 방식 */
+    } catch (e) { bad(); }
+  }
+
+  /* 녹음 한 조각을 그대로 재생한다. 붓을 때마다 재생 속도를 살짝 달리해
+     같은 소리가 기계처럼 반복되지 않게 한다(0.94~1.06배 = 길이 0.38~0.43초). */
+  function playPour(c, lvl, delay) {
+    if (!pourBuf) return false;
+    var src = null, g = null;
+    try {
+      var rate = 0.94 + Math.random() * 0.12;
+      var t0 = c.currentTime + (delay === undefined ? 0.002 : delay);
+      src = c.createBufferSource();
+      src.buffer = pourBuf;
+      src.playbackRate.value = rate;
+      g = c.createGain();
+      g.gain.value = pourVol * lvl;
+      src.connect(g); g.connect(out(c));       /* 마스터 게인 → 컴프레서 그대로 통과 */
+      src.start(t0);
+      src.stop(t0 + pourBuf.duration / rate + 0.02);
+      return true;
+    } catch (e) {
+      try { if (src) src.disconnect(); if (g) g.disconnect(); } catch (e2) {}
+      return false;
+    }
+  }
+
   /* 코르크 마개가 닫히는 소리 — 나무가 닿는 짧은 마찰 + 톡 하고 내려앉는 몸통 + 뽕 */
   function corkSound(c) {
     var t0 = c.currentTime + 0.008;
@@ -1524,6 +1602,7 @@ var Sound = (function () {
   }
 
   arm();
+  fetchPour();                                /* 페이지가 뜨면 파일만 먼저 받아 둔다 */
 
   return {
     unlock: function () { var c = raw(); if (!c) return false; kick(c); return c.state === 'running'; },
@@ -1537,14 +1616,20 @@ var Sound = (function () {
       return muted;
     },
     pick: function () { tone(720, { dur: 0.08, type: 'triangle', vol: 0.05, to: 980 }); },
-    /* 병에서 병으로 따를 때 — '쪼르륵' */
+    /* 병에서 병으로 따를 때 — 실제 물 따르는 녹음 '쪼르륵' */
     pour: function () {
       if (muted) return;
       var c = ac(); if (!c) return;
       var lvl = pourLevel();
       if (!lvl) return;                  /* 네 병 이상이 겹치는 순간엔 조용히 넘긴다 */
-      pourBody(c, lvl);
+      if (!pourBuf) decodePour();
+      if (playPour(c, lvl)) return;      /* 아직 준비 전이면 이번 붓기는 조용히 넘긴다 */
+      if (!pourBytes && !pourDead) fetchPour();
+      else if (pourDead) pourBody(c, lvl);   /* 음원을 끝내 못 받았을 때만 합성음으로 대신 */
     },
+    /* 검증용: 녹음이 실제로 디코딩됐는지 */
+    pourReady: function () { return !!pourBuf; },
+    loadPour: function () { return fetchPour(); },
     /* 병이 다 차서 코르크 마개로 닫힐 때 — '톡/뽕' */
     cork: function () {
       if (muted) return;
@@ -1585,8 +1670,9 @@ var Sound = (function () {
       ctx = oac; busNode = null; busCtx = null;
       try {
         for (var i = 0; i < (count || 1); i++) {
-          if (name === 'pour') pourBody(oac, 1, i * (gap || 0.03));
-          else if (name === 'cork') corkSound(oac);
+          if (name === 'pour') {
+            if (!playPour(oac, 1, i * (gap || 0.03))) pourBody(oac, 1, i * (gap || 0.03));
+          } else if (name === 'cork') corkSound(oac);
         }
       } catch (e) {
         ctx = prevCtx; busNode = prevBusNode; busCtx = prevBusCtx;
