@@ -1323,35 +1323,108 @@ var Sound = (function () {
   var armed = false;
   var busNode = null, busCtx = null;          /* 마스터 게인 → 컴프레서 */
   var pourVoices = 0, pourAt = 0;             /* 220ms 동시 붓기: 겹침 조절용 */
-  var silentBuf = null;                       /* iOS 잠금 해제용 1샘플 무음 버퍼 (한 번만 생성) */
+  var silentBuf = null, silentCtx = null;     /* iOS 잠금 해제용 1샘플 무음 버퍼 — 컨텍스트마다 1개 */
+  var kickAt = 0;                             /* 마지막 잠금 해제 시도 시각 (값싼 재시도 간격) */
+  var wdTimer = 0;                            /* 제스처 뒤에도 안 풀리는지 지켜보는 타이머 */
+  var stuck = false;                          /* resume 으로도 안 풀린 컨텍스트 — 다음 터치에서 새로 만든다 */
+  var ctxGen = 0;                             /* 컨텍스트를 몇 번째로 만들었는지 (검증용) */
+  var lateT = null;                           /* 디코딩이 늦어 조용히 지나간 붓기 — 준비되면 한 번 들려준다 */
 
-  function raw() {
-    if (!ctx) {
-      var AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return null;
-      try { ctx = new AC(); } catch (e) { return null; }
-    }
-    return ctx;
+  /* iOS 오디오 세션: 무음 스위치(Ring/Silent)가 켜져 있어도 게임 소리가 나오게 한다.
+     iOS 17.4+ Safari 의 navigator.audioSession. 지원하지 않는 브라우저에서는 조용히 지나간다. */
+  function preferPlayback() {
+    try {
+      var sess = navigator.audioSession;
+      if (sess && sess.type !== 'playback') sess.type = 'playback';
+    } catch (e) {}
   }
+
+  function makeCtx() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    var c = null;
+    try { c = new AC(); } catch (e) { return null; }
+    ctx = c; ctxGen++;
+    silentBuf = null; silentCtx = null;
+    busNode = null; busCtx = null;
+    stuck = false; kickAt = 0;
+    try {
+      c.onstatechange = function () {
+        /* 백그라운드·화면 잠금·통화로 잠기면 다음 터치에서 다시 풀도록 표시만 한다 */
+        if (c.state === 'running') { stuck = false; }
+        else if (!document.hidden) { kickAt = 0; }
+      };
+    } catch (e) {}
+    preferPlayback();
+    return c;
+  }
+
+  function silentFor(c) {
+    if (!silentBuf || silentCtx !== c) {
+      try { silentBuf = c.createBuffer(1, 1, 22050); silentCtx = c; }
+      catch (e) { silentBuf = null; silentCtx = null; return null; }
+    }
+    return silentBuf;
+  }
+
   /* iOS Safari·홈 화면 앱은 '사용자 제스처 안에서' resume + 무음 1샘플 재생을 해야
      오디오 컨텍스트가 running 으로 풀린다. 제스처 밖에서 만든 컨텍스트는 계속 잠긴다. */
   function kick(c) {
-    if (!c) return;
+    if (!c) return false;
+    kickAt = Date.now();
     try {
       if (c.state !== 'running' && c.resume) {
         var pr = c.resume();
         if (pr && pr.catch) pr.catch(function () {});
       }
-      var s = c.createBufferSource();
-      if (!silentBuf) { silentBuf = c.createBuffer(1, 1, 22050); }
-      s.buffer = silentBuf;
+      var s = c.createBufferSource(), b = silentFor(c);
+      if (b) s.buffer = b;
       s.connect(c.destination);
       if (s.start) s.start(0); else if (s.noteOn) s.noteOn(0);
     } catch (e) {}
     if (!pourBuf) decodePour();               /* 오디오가 열린 첫 제스처에서 바로 디코딩 */
+    if (c.state !== 'running') watch(c);
+    return c.state === 'running';
   }
+
+  /* 제스처 안에서 resume 했는데도 0.7초 안에 running 이 안 되면 그 컨텍스트는 죽은 것으로 본다.
+     iOS 는 통화·화면 잠금 뒤 'interrupted' 에 갇히면 resume 이 영영 안 풀리는 일이 있다. */
+  function watch(c) {
+    if (wdTimer) return;
+    wdTimer = setTimeout(function () {
+      wdTimer = 0;
+      if (ctx !== c) return;
+      if (c.state === 'running') { stuck = false; return; }
+      stuck = true;
+    }, 700);
+  }
+
+  /* 죽은 컨텍스트는 버리고 새로 만든다 — iOS 에서 확실히 살아나는 방법.
+     잠긴 채로 조용한 것보다 낫다. 붓는 소리 녹음은 새 컨텍스트로 다시 디코딩한다. */
+  function rebuild() {
+    var old = ctx;
+    ctx = null;
+    try { if (old && old.close) { var p = old.close(); if (p && p.catch) p.catch(function () {}); } } catch (e) {}
+    busNode = null; busCtx = null; silentBuf = null; silentCtx = null;
+    pourBuf = null; pourDecoding = false; pourDead = false; pourTries = 0;
+    var c = makeCtx();
+    if (c && pourBytes) decodePour();
+    return kick(c);
+  }
+
+  /* 모든 사용자 제스처에서 부른다 — 이미 열려 있으면 값싸게 지나간다(탭마다 버퍼를 만들지 않는다) */
+  function ensure(force) {
+    if (stuck) return rebuild();
+    if (!ctx) return kick(makeCtx());
+    if (ctx.state === 'closed') return rebuild();
+    if (force || ctx.state !== 'running') return kick(ctx);
+    /* state 가 running 이어도 iOS 가 조용히 잠가 둔 경우가 있어, 1.5초에 한 번은 가볍게 다시 푼다 */
+    if (Date.now() - kickAt > 1500) return kick(ctx);
+    return true;
+  }
+
   function ac() {
-    var c = raw(); if (!c) return null;
+    var c = ctx || makeCtx(); if (!c) return null;
     if (c.state !== 'running') kick(c);
     return c;
   }
@@ -1359,10 +1432,25 @@ var Sound = (function () {
   function arm() {
     if (armed) return;
     armed = true;
-    var fire = function () { if (ctx && ctx.state === 'running') return; kick(raw()); };
+    var fire = function () { ensure(false); };
     ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'].forEach(function (t) {
       document.addEventListener(t, fire, { passive: true, capture: true });
     });
+  }
+
+  /* 첫 붓기가 디코딩보다 먼저 와서 조용히 지나갔을 때 — 준비되는 대로 한 번만 들려준다 */
+  function latePour(c, lvl) {
+    if (lateT) return;
+    var t0 = Date.now();
+    lateT = setInterval(function () {
+      if (muted || ctx !== c) { clearInterval(lateT); lateT = null; return; }
+      if (pourBuf) {
+        clearInterval(lateT); lateT = null;
+        if (c.state === 'running') playPour(c, lvl);
+        return;
+      }
+      if (pourDead || Date.now() - t0 > 1200) { clearInterval(lateT); lateT = null; }
+    }, 60);
   }
 
   /* 모든 소리는 마스터 게인 → 컴프레서를 지나간다 — 여러 병을 연달아 부어도 찢어지지 않는다 */
@@ -1498,7 +1586,7 @@ var Sound = (function () {
      ================================================================== */
   var pourBytes = null, pourBuf = null, pourFetching = null, pourDecoding = false;
   var pourDead = false, pourTries = 0;
-  var pourVol = 0.07;                         /* 녹음 피크 0.89 · RMS 0.137 기준 음량 */
+  var pourVol = 0.18;                         /* 녹음 피크 0.89 · RMS 0.137 기준 — 폰 스피커에서도 들리게 */
 
   function fetchPour() {
     if (pourBytes || pourFetching || pourDead) return pourFetching;
@@ -1527,10 +1615,16 @@ var Sound = (function () {
   function decodePour() {
     if (pourBuf || !pourBytes || pourDecoding) return;
     var c = ctx;                               /* 이미 열린 컨텍스트가 있을 때만 (iOS: 제스처 밖 생성 금지) */
-    if (!c) return;                            /* 아직 오디오가 없으면 첫 터치 뒤로 미룬다 */
+    if (!c || c.state === 'closed' || typeof c.startRendering === 'function') return;   /* 아직 오디오가 없으면 첫 터치 뒤로 미룬다 */
+    /* decodeAudioData 는 건네준 ArrayBuffer 를 비워버린다(Safari 포함) — 사본을 넘겨 원본을 남긴다.
+       그래야 디코딩이 실패해도 다음에 다시 시도할 수 있다. */
+    var ab;
+    try { ab = pourBytes.slice(0); } catch (e) { ab = pourBytes; }
     var ab = pourBytes;
+    var ab;
+    try { ab = pourBytes.slice(0); } catch (e) { ab = pourBytes; }
     pourDecoding = true;
-    function ok(buf) { pourDecoding = false; if (buf && !pourBuf) pourBuf = buf; }
+    function ok(buf) { pourDecoding = false; if (buf && !pourBuf) { pourBuf = buf; pourDead = false; } }
     function bad() {                           /* 오디오가 통째로 망가진 경우만 재시도 */
       pourDecoding = false;
       pourBytes = null;
@@ -1555,7 +1649,14 @@ var Sound = (function () {
       src.playbackRate.value = rate;
       g = c.createGain();
       g.gain.value = pourVol * lvl;
-      src.connect(g); g.connect(out(c));       /* 마스터 게인 → 컴프레서 그대로 통과 */
+      /* 폰 스피커는 1kHz 아래를 크게 깎는다 — 물소리가 들리게 그 대역만 살짝 올린다 */
+      var f = null;
+      try {
+        f = c.createBiquadFilter();
+        f.type = 'peaking'; f.frequency.value = 1150; f.Q.value = 0.8; f.gain.value = 5;
+        src.connect(f); f.connect(g);
+      } catch (e3) { src.connect(g); }
+      g.connect(out(c));                       /* 마스터 게인 → 컴프레서 그대로 통과 */
       src.start(t0);
       src.stop(t0 + pourBuf.duration / rate + 0.02);
       return true;
@@ -1564,7 +1665,6 @@ var Sound = (function () {
       return false;
     }
   }
-
   /* 코르크 마개가 닫히는 소리 — 나무가 닿는 짧은 마찰 + 톡 하고 내려앉는 몸통 + 뽕 */
   function corkSound(c) {
     var t0 = c.currentTime + 0.008;
@@ -1620,17 +1720,17 @@ var Sound = (function () {
   fetchPour();                                /* 페이지가 뜨면 파일만 먼저 받아 둔다 */
 
   return {
-    unlock: function () {
-      if (ctx && ctx.state === 'running') return true;   /* 이미 열렸으면 탭마다 손대지 않는다 */
-      var c = raw(); if (!c) return false; kick(c); return c.state === 'running';
-    },
-    rearm: function () { arm(); if (ctx && ctx.state !== 'running') kick(ctx); },
+    /* 병·버튼을 누를 때 부른다 — 살아 있으면 값싸게 지나가고, 잠겼거나 죽었으면 다시 푼다 */
+    unlock: function () { return ensure(false); },
+    /* 화면 복귀·포그라운드 복귀: 제스처 밖이라 resume 은 안 한다.
+       다음 터치가 반드시 한 번 더 풀도록 표시만 해 둔다. */
+    rearm: function () { arm(); kickAt = 0; if (ctx && ctx.state !== 'running') watch(ctx); },
     isMuted: function () { return muted; },
     isRunning: function () { return !!ctx && ctx.state === 'running'; },
     toggle: function () {
       muted = !muted;
       store('wsp.muted', muted ? '1' : '0');
-      if (!muted) { this.pick(); }
+      if (!muted) { ensure(true); this.pick(); }
       return muted;
     },
     pick: function () { tone(720, { dur: 0.08, type: 'triangle', vol: 0.05, to: 980 }); },
@@ -1641,13 +1741,19 @@ var Sound = (function () {
       var lvl = pourLevel();
       if (!lvl) return;                  /* 네 병 이상이 겹치는 순간엔 조용히 넘긴다 */
       if (!pourBuf) decodePour();
-      if (playPour(c, lvl)) return;      /* 아직 준비 전이면 이번 붓기는 조용히 넘긴다 */
-      if (!pourBytes && !pourDead) fetchPour();
-      else if (pourDead) pourBody(c, lvl);   /* 음원을 끝내 못 받았을 때만 합성음으로 대신 */
+      if (playPour(c, lvl)) return;      /* 녹음이 있으면 바로 재생 */
+      if (pourDead) { pourBody(c, lvl); return; }   /* 음원을 끝내 못 받았을 때만 합성음으로 대신 */
+      if (!pourBytes) fetchPour();
+      latePour(c, lvl);                  /* 디코딩 중이면 준비되는 대로 한 번 들려준다(조용히 사라지지 않게) */
     },
     /* 검증용: 녹음이 실제로 디코딩됐는지 */
     pourReady: function () { return !!pourBuf; },
     loadPour: function () { return fetchPour(); },
+    /* 검증용: 오디오 컨텍스트 상태(생성 횟수·잠김 여부) */
+    state: function () {
+      return { has: !!ctx, state: ctx ? ctx.state : null, stuck: stuck,
+               gen: ctxGen, sinceKick: kickAt ? Date.now() - kickAt : -1, pour: !!pourBuf };
+    },
     /* 병이 다 차서 코르크 마개로 닫힐 때 — '톡/뽕' */
     cork: function () {
       if (muted) return;
@@ -2336,6 +2442,15 @@ function doPour(fromId, toId, amount) {
     setStatus('가운데 병에 ' + COLOR_NAMES[to.goal] + ' ' + to.cells.length + '/' + to.cap + '칸 — ' +
               (to.cap - to.cells.length) + '칸 남았어요');
   }
+  hintMuted();
+}
+
+/* 소리가 꺼진 상태로 붓고 있으면 한 번만 알려 준다 — '소리가 안 났다'와 헷갈리지 않게 */
+var muteHinted = false;
+function hintMuted() {
+  if (muteHinted || !Sound.isMuted()) return;
+  muteHinted = true;
+  setStatus('소리가 꺼져 있어요 — 오른쪽 위 스피커를 누르면 켜져요');
 }
 
 function onBottleClick(id) {
