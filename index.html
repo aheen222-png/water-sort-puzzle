@@ -3004,35 +3004,39 @@ var Room = (function () {
 
   /* ---------- 방 등급 — 26단계 ----------
      bg: 단계마다 1장씩 다른 배경 일러스트(assets/). 한 단계 오를 때마다 방 그림이 눈에 띄게 달라진다.
+     reqLv: 해금 레벨 — 레벨 100에 4단계(볕 드는 옥탑방)가 열리고, 마지막 26단계가 Lv.980이다.
      21단계부터는 마지막 배경(황금 궁전)에 단계별 빛(HUD tint)을 덧입힌 '팰리스' 방이다. */
   var RG = [
-    { n: 1,  name: '낡은 단칸방',       sub: '찢어진 벽지 · 알전구 · 낡은 마루', price: 0,    cap: 1, bg: 'stage01.webp' },
-    { n: 2,  name: '정리한 고시원',     sub: '닦은 장판 · 벽시계 · 정리된 선반',  price: 260,  reqLv: 6,   cap: 1, bg: 'stage02.webp' },
-    { n: 3,  name: '골목 반지하',       sub: '반달 창 · 달빛 한 줄',             price: 460,  reqLv: 14,  cap: 1, bg: 'stage03.webp' },
-    { n: 4,  name: '볕 드는 옥탑방',    sub: '옥상 빨랫줄 · 창가 햇살',          price: 660,  reqLv: 22,  cap: 2, bg: 'stage04.webp' },
-    { n: 5,  name: '햇살 원룸',         sub: '밝은 벽지 · 하늘 창',              price: 860,  reqLv: 30,  cap: 2, bg: 'stage05.webp' },
-    { n: 6,  name: '복층 스튜디오',     sub: '사다리 선반 · 높은 창',            price: 1100, reqLv: 38,  cap: 3, bg: 'stage06.webp' },
-    { n: 7,  name: '감성 오피스텔',     sub: '스트링 라이트 · 무드등',           price: 1370, reqLv: 46,  cap: 3, bg: 'stage07.webp' },
-    { n: 8,  name: '아늑한 투룸',       sub: '아치 창 · 노을 · 벽난로',          price: 1650, reqLv: 54,  cap: 3, bg: 'stage08.webp' },
-    { n: 9,  name: '화분 가득 테라스',  sub: '테라스 화단 · 넝쿨',               price: 1960, reqLv: 62,  cap: 4, bg: 'stage09.webp' },
-    { n: 10, name: '노을 뷰 하우스',    sub: '긴 창으로 드는 저녁 빛',           price: 2290, reqLv: 70,  cap: 4, bg: 'stage10.webp' },
-    { n: 11, name: '루프탑 아파트',     sub: '밤하늘 · 도시 야경',               price: 2650, reqLv: 78,  cap: 4, bg: 'stage11.webp' },
-    { n: 12, name: '모던 펜트하우스',   sub: '대리석 바닥 · 다운라이트',          price: 3010, reqLv: 86,  cap: 4, bg: 'stage12.webp' },
-    { n: 13, name: '시티뷰 스위트',     sub: '통창 프레임 · 반사빛',             price: 3410, reqLv: 94,  cap: 5, bg: 'stage13.webp' },
-    { n: 14, name: '하이엔드 빌라',     sub: '아트월 · 우아한 소품',             price: 3830, reqLv: 102, cap: 5, bg: 'stage14.webp' },
-    { n: 15, name: '가든 저택',         sub: '정원 넝쿨 · 바닥 화분',            price: 4270, reqLv: 110, cap: 5, bg: 'stage15.webp' },
-    { n: 16, name: '로열 타운하우스',   sub: '기둥 · 레드 커튼',                 price: 4730, reqLv: 118, cap: 5, bg: 'stage16.webp' },
-    { n: 17, name: '그랜드 저택',       sub: '샹들리에 · 금장 몰딩',             price: 5210, reqLv: 126, cap: 5, bg: 'stage17.webp' },
-    { n: 18, name: '로열 팰리스',       sub: '황금 벽 · 붉은 융단',               price: 5720, reqLv: 134, cap: 5, bg: 'stage18.webp' },
-    { n: 19, name: '황금 궁궐',         sub: '황금 기둥 · 레드 카펫',             price: 6250, reqLv: 142, cap: 5, bg: 'stage19.webp' },
-    { n: 20, name: '전설의 크라운 팰리스', sub: '왕관 홀 · 황금 빛',              price: 6900, reqLv: 150, cap: 5, bg: 'stage20.webp' },
-    { n: 21, name: '별빛 팰리스',       sub: '왕관 홀 · 쏟아지는 별빛',          price: 7800, reqLv: 164, cap: 5, bg: 'stage20.webp', tint: 'star' },
-    { n: 22, name: '오로라 팰리스',     sub: '왕관 홀 · 초록 오로라',            price: 8800, reqLv: 178, cap: 5, bg: 'stage20.webp', tint: 'aurora' },
-    { n: 23, name: '노을 황금궁',       sub: '왕관 홀 · 붉게 물든 노을',          price: 9900, reqLv: 192, cap: 5, bg: 'stage20.webp', tint: 'sunset' },
-    { n: 24, name: '달빛 크라운 팰리스', sub: '왕관 홀 · 은빛 달빛',             price: 11100, reqLv: 206, cap: 5, bg: 'stage20.webp', tint: 'moon' },
-    { n: 25, name: '천상의 팰리스',     sub: '왕관 홀 · 구름 위 하늘빛',          price: 12400, reqLv: 222, cap: 5, bg: 'stage20.webp', tint: 'sky' },
-    { n: 26, name: '영원의 크라운 팰리스', sub: '영원히 빛나는 황금 왕관 홀',     price: 13800, reqLv: 240, cap: 5, bg: 'stage20.webp', tint: 'eternal' }
+    { n: 1,  name: '낡은 단칸방',       sub: '찢어진 벽지 · 알전구 · 낡은 마루', price: 0,    reqLv: 1,   cap: 1, bg: 'stage01.webp' },
+    { n: 2,  name: '골목 반지하',       sub: '물얼룩 벽지 · 쇠창살 창 · 눅눅한 장판', price: 250,  reqLv: 28,  cap: 1, bg: 'stage02.webp' },
+    { n: 3,  name: '고시원',            sub: '좁은 단칸 · 접이식 책상 · 라면 컵', price: 460,  reqLv: 62,  cap: 1, bg: 'stage03.webp' },
+    { n: 4,  name: '볕 드는 옥탑방',    sub: '옥상 빨랫줄 · 창가 햇살',          price: 720,  reqLv: 100, cap: 2, bg: 'stage04.webp' },
+    { n: 5,  name: '햇살 원룸',         sub: '밝은 벽지 · 하늘 창',              price: 1000, reqLv: 140, cap: 2, bg: 'stage05.webp' },
+    { n: 6,  name: '복층 스튜디오',     sub: '사다리 선반 · 높은 창',            price: 1050, reqLv: 170, cap: 3, bg: 'stage06.webp' },
+    { n: 7,  name: '감성 오피스텔',     sub: '스트링 라이트 · 무드등',           price: 1250, reqLv: 201, cap: 3, bg: 'stage07.webp' },
+    { n: 8,  name: '아늑한 투룸',       sub: '아치 창 · 노을 · 벽난로',          price: 1450, reqLv: 233, cap: 3, bg: 'stage08.webp' },
+    { n: 9,  name: '화분 가득 테라스',  sub: '테라스 화단 · 넝쿨',               price: 1660, reqLv: 266, cap: 4, bg: 'stage09.webp' },
+    { n: 10, name: '노을 뷰 하우스',    sub: '긴 창으로 드는 저녁 빛',           price: 1880, reqLv: 300, cap: 4, bg: 'stage10.webp' },
+    { n: 11, name: '루프탑 아파트',     sub: '밤하늘 · 도시 야경',               price: 2100, reqLv: 335, cap: 4, bg: 'stage11.webp' },
+    { n: 12, name: '모던 펜트하우스',   sub: '대리석 바닥 · 다운라이트',          price: 2350, reqLv: 371, cap: 4, bg: 'stage12.webp' },
+    { n: 13, name: '시티뷰 스위트',     sub: '통창 프레임 · 반사빛',             price: 2600, reqLv: 408, cap: 5, bg: 'stage13.webp' },
+    { n: 14, name: '하이엔드 빌라',     sub: '아트월 · 우아한 소품',             price: 2870, reqLv: 446, cap: 5, bg: 'stage14.webp' },
+    { n: 15, name: '가든 저택',         sub: '정원 넝쿨 · 바닥 화분',            price: 3150, reqLv: 485, cap: 5, bg: 'stage15.webp' },
+    { n: 16, name: '로열 타운하우스',   sub: '기둥 · 레드 커튼',                 price: 3450, reqLv: 525, cap: 5, bg: 'stage16.webp' },
+    { n: 17, name: '그랜드 저택',       sub: '샹들리에 · 금장 몰딩',             price: 3770, reqLv: 566, cap: 5, bg: 'stage17.webp' },
+    { n: 18, name: '로열 팰리스',       sub: '황금 벽 · 붉은 융단',               price: 4100, reqLv: 608, cap: 5, bg: 'stage18.webp' },
+    { n: 19, name: '황금 궁궐',         sub: '황금 기둥 · 레드 카펫',             price: 4450, reqLv: 651, cap: 5, bg: 'stage19.webp' },
+    { n: 20, name: '전설의 크라운 팰리스', sub: '왕관 홀 · 황금 빛',              price: 4820, reqLv: 695, cap: 5, bg: 'stage20.webp' },
+    { n: 21, name: '별빛 팰리스',       sub: '왕관 홀 · 쏟아지는 별빛',          price: 5250, reqLv: 740, cap: 5, bg: 'stage20.webp', tint: 'star' },
+    { n: 22, name: '오로라 팰리스',     sub: '왕관 홀 · 초록 오로라',            price: 5700, reqLv: 786, cap: 5, bg: 'stage20.webp', tint: 'aurora' },
+    { n: 23, name: '노을 황금궁',       sub: '왕관 홀 · 붉게 물든 노을',          price: 6200, reqLv: 833, cap: 5, bg: 'stage20.webp', tint: 'sunset' },
+    { n: 24, name: '달빛 크라운 팰리스', sub: '왕관 홀 · 은빛 달빛',             price: 6750, reqLv: 881, cap: 5, bg: 'stage20.webp', tint: 'moon' },
+    { n: 25, name: '천상의 팰리스',     sub: '왕관 홀 · 구름 위 하늘빛',          price: 7350, reqLv: 930, cap: 5, bg: 'stage20.webp', tint: 'sky' },
+    { n: 26, name: '영원의 크라운 팰리스', sub: '영원히 빛나는 황금 왕관 홀',     price: 8000, reqLv: 980, cap: 5, bg: 'stage20.webp', tint: 'eternal' }
   ];
+  /* 이번 개편 전까지 쓰던 방 가격표 — 환불은 '실제로 낸 금액'인 이 값으로 계산한다 */
+  var RG_OLD_PRICE = [0, 260, 460, 660, 860, 1100, 1370, 1650, 1960, 2290, 2650, 3010, 3410, 3830, 4270,
+                      4730, 5210, 5720, 6250, 6900, 7800, 8800, 9900, 11100, 12400, 13800];
   /* 예전 5단계 저장을 새 단계로 이사시킨다 (해금한 방은 그대로 유지) */
   var GRADE_OLD = { 1: 1, 2: 5, 3: 8, 4: 12, 5: 19 };
   var GRADE_MAX = RG.length;
@@ -3218,6 +3222,7 @@ var Room = (function () {
   var welcomePending = 0;
   var refundPending = 0, refundNames = '';
   var refundGradePending = 0;   /* 방 이사 취소 환불 금액 (아직 안 띄웠으면 0보다 큼) */
+  var gradeRebuildPending = 0;  /* 레벨 100=4단계 개편으로 1단계로 돌아간 뒤의 환불 금액 (아직 안 띄웠으면 0보다 큼) */
   var resetPending = 0;      /* 600코인 환불 + 방 초기화 토스트 (아직 안 띄웠으면 1) */
   var lastAwardKey = '';
 
@@ -3314,7 +3319,7 @@ var Room = (function () {
       store('wsp.room.rf_grade_back', '1');
       if (RS.maxGrade > 1) {
         var gsum = 0, gi;
-        for (gi = 2; gi <= RS.maxGrade; gi++) gsum += RG[gi - 1].price;
+        for (gi = 2; gi <= RS.maxGrade; gi++) gsum += (RG_OLD_PRICE[gi - 1] || 0);
         if (gsum > 0) {
           RS.coins += gsum;
           RS.grade = 1;
@@ -3322,6 +3327,21 @@ var Room = (function () {
           refundGradePending = gsum;
         }
       }
+    }
+
+    /* ---- 1회성: 방 해금 레벨을 'Lv.100 = 4단계' 기준으로 올리며, 방에 쓴 코인 전액 환불 + 1단계 복귀 ----
+       해금 레벨이 크게 올라 예전 기준으로 잠금이 어긋나므로, 지금까지 낸 방 값(옛 가격표)을 그대로 돌려주고
+       1단계부터 새 기준으로 다시 올라가게 한다. 퍼즐 레벨·코인·입양한 친구·산 아이템은 그대로 둔다. */
+    if (store('wsp.room.rf_lv100_v1') === null) {
+      store('wsp.room.rf_lv100_v1', '1');
+      var bsum = 0, bi;
+      for (bi = 2; bi <= RS.maxGrade; bi++) bsum += (RG_OLD_PRICE[bi - 1] || 0);
+      if (bsum > 0) {
+        RS.coins += bsum;
+        gradeRebuildPending = bsum;
+      }
+      RS.grade = 1;
+      RS.maxGrade = 1;
     }
 
     /* 펫 목록 — 새 저장 형식(wsp.room.pets), 없으면 예전 1마리 저장에서 이사 */
@@ -3379,6 +3399,17 @@ var Room = (function () {
   function petsAtCap() { return RS.pets.length >= capacity(); }
   /* 화면 표시용 상한 — 환불로 방이 1단계가 돼도 이미 사는 친구가 쫓겨나 보이지 않게 */
   function capShown() { return Math.max(capacity(), RS.pets.length); }
+  /* 지금보다 넓어지는 다음 방 — 1~3단계는 모두 1마리라 '이사하면 몇 마리' 대신 해금 레벨을 알려 준다.
+     상한보다 많은 친구와 이미 살고 있으면(환불로 1단계가 된 경우) 그 수를 넘기는 방을 찾는다. */
+  function nextWiderRoom() {
+    var have = Math.max(capacity(), RS.pets.length);
+    for (var q = RS.maxGrade + 1; q <= GRADE_MAX; q++) if (RG[q - 1].cap > have) return RG[q - 1];
+    return null;
+  }
+  function capHint() {
+    var w = nextWiderRoom();
+    return w ? (w.cap + '마리까지는 Lv.' + gradeReqLv(w) + '부터') : '마지막 방이에요';
+  }
   function hasBreed(id) { for (var i = 0; i < RS.pets.length; i++) if (RS.pets[i].breed === id) return true; return false; }
   function adoptPrice(b) { return RS.pets.length === 0 ? 0 : b.price; }
   function leadIndex() { return Math.min(Math.max(0, RS.lead), Math.max(0, RS.pets.length - 1)); }
@@ -5445,7 +5476,7 @@ var Room = (function () {
 
   function playerLevel() { return Math.max(1, num(store('wsp.level'), 1)); }
   function levelLocked(it) { return playerLevel() < (it.req || 1); }
-  /* 방 단계 해금 레벨 — 2단계 Lv.6 부터 20단계 Lv.150, 26단계 Lv.240 까지 */
+  /* 방 단계 해금 레벨 — 2단계 Lv.28 · 3단계 Lv.62 · 4단계 Lv.100 · 26단계 Lv.980 */
   function gradeReqLv(g) { return (g && g.reqLv) || 1; }
   function gradeLocked(g) { return playerLevel() < gradeReqLv(g); }
   /* 친구 입양 해금 레벨 — 1번째 무료(Lv.1) · 2번째 15 · 3번째 35 · 4번째 60 · 5번째 85 */
@@ -5708,7 +5739,7 @@ var Room = (function () {
     if (n < cap) s += petLevelLocked()
       ? ('<p class="room-hint">다음 친구는 <b>Lv.' + petReqLv() + '</b>부터 입양할 수 있어요.</p>')
       : '<p class="room-hint"><b>입양</b> 탭에서 새 품종을 맞이할 수 있어요.</p>';
-    else if (RS.maxGrade < GRADE_MAX) s += '<p class="room-hint">지금 방은 가득 찼어요. <b>방</b> 탭에서 이사하면 ' + RG[RS.maxGrade].cap + '마리까지 늘어나요.</p>';
+    else if (RS.maxGrade < GRADE_MAX) s += '<p class="room-hint">지금 방은 가득 찼어요. ' + capHint() + '.</p>';
     else s += '<p class="room-hint">가장 넓은 방에는 다섯 친구까지 함께 살 수 있어요.</p>';
     return s;
   }
@@ -5906,7 +5937,7 @@ var Room = (function () {
     if (!b) return 0;
     if (hasBreed(b.id)) { toast(b.name + '는 이미 함께 살고 있어요'); Sound.pick(); return 0; }
     if (petsAtCap()) {
-      if (RS.maxGrade < GRADE_MAX) toast('지금 방은 ' + capacity() + '마리까지예요 · 방을 넓히면 ' + RG[RS.maxGrade].cap + '마리까지');
+      if (RS.maxGrade < GRADE_MAX) toast('지금 방은 ' + capacity() + '마리까지예요 · ' + capHint());
       else toast('궁궐은 다섯 친구까지 함께 살 수 있어요');
       Sound.fail();
       return 0;
@@ -6014,6 +6045,11 @@ var Room = (function () {
     if (resetPending) {
       resetPending = 0;
       setTimeout(function () { toast('방 꾸미기 초기화 · 600코인 환불 완료!'); }, 620);
+    }
+    if (gradeRebuildPending) {
+      var gb = gradeRebuildPending;
+      gradeRebuildPending = 0;
+      setTimeout(function () { toast('방 기준이 바뀌어 1단계로 돌아왔어요 · 방에 쓴 ' + fmt(gb) + '코인 환불!'); }, 820);
     }
   }
   function close() {
@@ -6172,6 +6208,11 @@ var Room = (function () {
       refundGradePending = 0;
       setTimeout(function () { toast('방 이사 취소 · +' + fmt(rg) + '코인 환불 완료!'); }, 900);
     }
+    if (gradeRebuildPending) {
+      var rb = gradeRebuildPending;
+      gradeRebuildPending = 0;
+      setTimeout(function () { toast('방 기준이 바뀌어 1단계로 돌아왔어요 · 방에 쓴 ' + fmt(rb) + '코인 환불!'); }, 1100);
+    }
   }
 
   return { init: init, open: open, close: close, isOpen: isOpen, award: award, render: renderAll,
@@ -6185,7 +6226,7 @@ var Room = (function () {
                       owned: RS.owned, equipped: RS.equipped, preview: pvSlots, previewSlots: pvSlots,
                       previewFocus: pvFocus, previewCount: pvCount(), gradePreview: gradePreview };
            },
-           _rs: RS, _rg: RG, _items: ITEMS, _breeds: BREEDS, _slots: SLOTS,
+           _rs: RS, _rg: RG, _rgOldPrice: RG_OLD_PRICE, _items: ITEMS, _breeds: BREEDS, _slots: SLOTS,
            _bonus: clearBonus,
            _preview: function (id) { var it = itemById(id); if (it) setPreview(it); return pvSlots; },
            _tapGrade: tapGrade, _moveIn: moveIn,
@@ -6272,7 +6313,7 @@ if (window.__wsp) {
     reset: function () {
       var keys = ['wsp.coins', 'wsp.room.grade', 'wsp.room.mg', 'wsp.room.rf_grade_back', 'wsp.room.char', 'wsp.room.owned', 'wsp.room.equipped',
                   'wsp.room.welcome', 'wsp.room.pets', 'wsp.room.lead', 'wsp.room.out', 'wsp.room.rgv', 'wsp.room.rf1',
-                  'wsp.room.rf600'];
+                  'wsp.room.rf600', 'wsp.room.rf_lv100_v1'];
       keys.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
       location.reload();
     }
