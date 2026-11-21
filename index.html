@@ -603,10 +603,15 @@ body{
   background:rgba(10,12,26,.55); border:1px solid rgba(255,255,255,.18); color:#eaf0ff;
   pointer-events:none;
 }
+/* 빈 방 안내 — 방 그림(침대·소품)을 가리지 않게 아래쪽에만 낮게 깐다 */
 .stage-empty{
-  position:absolute; inset:0; display:grid; place-content:center; justify-items:center; gap:9px; text-align:center;
-  padding:16px; background:linear-gradient(180deg, rgba(8,10,22,.28), rgba(8,10,22,.62));
+  position:absolute; left:0; right:0; bottom:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:flex-end; gap:7px; text-align:center; padding:14px 12px 12px;
+  background:linear-gradient(180deg, rgba(8,10,22,0) 0%, rgba(8,10,22,.30) 46%, rgba(8,10,22,.66) 100%);
+  pointer-events:none;
 }
+.stage-empty .se-btns{ display:flex; gap:7px; pointer-events:auto; }
+.stage-empty [hidden]{ display:none !important; }
 .stage-empty[hidden]{ display:none; }
 .stage-empty p{ margin:0; font-size:11.5px; font-weight:750; color:#dfe7ff; letter-spacing:-.3px; text-shadow:0 2px 8px rgba(0,0,0,.6); }
 .btn-primary.sm{ width:auto; padding:9px 17px; font-size:12.5px; border-radius:999px; }
@@ -639,6 +644,23 @@ body{
   color:#d7e0ff; cursor:pointer;
 }
 .leadbtn:active{ transform:scale(.95); }
+/* 방에서 빼기 / 다시 부르기 — 대표 버튼 아래에 작게 */
+.petcard .pbtns{ flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.outbtn{
+  flex:0 0 auto; appearance:none; font:inherit; font-size:9px; font-weight:800; padding:4px 7px;
+  border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.16);
+  color:#c3cdea; cursor:pointer; white-space:nowrap; letter-spacing:-.2px;
+}
+.outbtn:active{ transform:scale(.95); }
+.outbtn.in{ background:rgba(127,230,180,.16); border-color:rgba(127,230,180,.55); color:#b7f6d6; }
+.petcard.out{ opacity:.72; }
+.petcard.out .av{ filter:grayscale(.55); }
+.prow{ display:flex; gap:6px; margin:0 2px 8px; }
+.ptog{
+  appearance:none; font:inherit; font-size:10px; font-weight:800; padding:5px 10px; border-radius:999px;
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); color:#d7e0ff; cursor:pointer;
+}
+.ptog:active{ transform:scale(.95); }
 .emptybox{
   display:flex; flex-direction:column; align-items:center; gap:10px; padding:20px 10px; border-radius:18px;
   border:1px dashed rgba(255,255,255,.2); background:rgba(255,255,255,.04);
@@ -850,8 +872,11 @@ body{
     <span class="grade-chip" id="gradeChip">1단계 · 낡은 단칸방</span>
     <span class="cap-chip" id="capChip">🐾 0/1</span>
     <div class="stage-empty" id="stageEmpty" hidden>
-      <p>아직 함께 사는 친구가 없어요</p>
-      <button class="btn-primary sm" id="btnAdoptFirst">첫 친구 무료 입양</button>
+      <p id="stageEmptyMsg">아직 함께 사는 친구가 없어요</p>
+      <div class="se-btns">
+        <button class="btn-primary sm" id="btnAdoptFirst">첫 친구 무료 입양</button>
+        <button class="btn-primary sm" id="btnBringAll" hidden>친구 다시 부르기</button>
+      </div>
     </div>
     <div class="stage-lock" id="stageLock" hidden>
       <div class="lk-veil">
@@ -925,8 +950,9 @@ function mulberry32(seed) {
       16~19 : 4×3  24   16칸     5  5,4,3,3,3
       20~24 : 4×3  24   16칸     5  6,3,3,3,3
       25~29 : 4×3  24   16칸     5  6,4,3,3,2
-      30+   : 4×3  24   16칸     5  7,3,3,3,2
-   · 20레벨 이상은 좌 12병(4단×3병) + 우 12병 + 가운데 1병 = 25병으로 꽉 찬 최대 배치. */
+      30~39 : 4×3  24   16칸     5  7,3,3,3,2
+   · 20레벨 이상은 좌 12병(4단×3병) + 우 12병 + 가운데 1병 = 25병으로 꽉 찬 최대 배치.
+   · 30레벨 이후는 HARD_BANDS 표(아래)를 따라 배분·가운데 병 길이·여유칸을 바꾼다(300+까지). */
 function levelConfig(level) {
   var tiers, per, tallCap, counts, i;
   if (level <= 1)       { tiers = 1; per = 3; tallCap = 0;  counts = [1, 1, 1, 1]; }
@@ -943,7 +969,16 @@ function levelConfig(level) {
   else if (level <= 19) { tiers = 4; per = 3; tallCap = 16; counts = [5, 4, 3, 3, 3]; }
   else if (level <= 24) { tiers = 4; per = 3; tallCap = 16; counts = [6, 3, 3, 3, 3]; }
   else if (level <= 29) { tiers = 4; per = 3; tallCap = 16; counts = [6, 4, 3, 3, 2]; }
-  else                  { tiers = 4; per = 3; tallCap = 16; counts = [7, 3, 3, 3, 2]; }
+  else {
+    /* 30레벨부터는 구간(band)마다 색 배분·가운데 병 길이·여유칸을 바꿔 300레벨 넘게 이어진다.
+       판 크기(좌 12병 + 우 12병 + 가운데 1병)는 화면에 맞춘 최대치라 늘리지 않고,
+       같은 색이 몇 병에 퍼지는지(배분)와 남는 빈칸(여유칸), 목표 색 병 길이로 난이도를 올린다.
+       · 배분 합 + tallCap/4 + spare = 24 (일반 병 24개)
+       · spare 2 → 여유 8칸, spare 1 → 여유 4칸(더 빡빡함)
+       · tallCap 16 → 20 → 24: 목표 색을 더 많이 모아야 끝난다 */
+    var band = hardBand(level);
+    tiers = 4; per = 3; tallCap = band[1]; counts = band[0];
+  }
 
   var tall = tallCap > 0;
   var normalBottles = 2 * tiers * per;                            // 좌우 대칭 배치
@@ -962,6 +997,48 @@ function levelConfig(level) {
     units: filled - (tall ? tallCap / 4 : 0) + (tall ? 1 : 0),    // 진행도 분모(완성 병 수)
     depth: depth, level: level
   };
+}
+
+/* 30레벨 이후 구간표 — [색 배분(5색 합계), 가운데 병 길이]  (여유칸은 24에서 자동 계산) */
+var HARD_BANDS = [
+  { to: 39,  counts: [7, 3, 3, 3, 2], tallCap: 16 },   // 30~39  기준 난이도
+  { to: 49,  counts: [6, 4, 4, 2, 2], tallCap: 16 },   // 40~49  색이 여러 병에 고르게 퍼짐
+  { to: 59,  counts: [5, 4, 4, 3, 2], tallCap: 16 },   // 50~59
+  { to: 69,  counts: [8, 4, 3, 2, 1], tallCap: 16 },   // 60~69  한 색이 몰리는 판
+  { to: 79,  counts: [4, 4, 4, 3, 3], tallCap: 16 },   // 70~79
+  { to: 89,  counts: [9, 3, 3, 2, 1], tallCap: 16 },   // 80~89
+  { to: 99,  counts: [6, 5, 3, 2, 2], tallCap: 16 },   // 90~99
+  { to: 109, counts: [8, 4, 4, 2, 1], tallCap: 16 },   // 100~109 여유칸 8→4칸
+  { to: 119, counts: [7, 4, 4, 3, 1], tallCap: 16 },   // 110~119
+  { to: 129, counts: [9, 4, 3, 2, 1], tallCap: 16 },   // 120~129
+  { to: 139, counts: [6, 4, 4, 3, 2], tallCap: 16 },   // 130~139
+  { to: 149, counts: [10, 3, 3, 2, 1], tallCap: 16 },  // 140~149
+  { to: 159, counts: [5, 5, 4, 3, 2], tallCap: 16 },   // 150~159
+  { to: 169, counts: [11, 3, 2, 2, 1], tallCap: 16 },  // 160~169
+  { to: 179, counts: [7, 5, 4, 2, 1], tallCap: 16 },   // 170~179
+  { to: 189, counts: [6, 4, 4, 4, 1], tallCap: 16 },   // 180~189
+  { to: 199, counts: [12, 3, 2, 1, 1], tallCap: 16 },  // 190~199
+  { to: 219, counts: [7, 4, 4, 2, 1], tallCap: 20 },   // 200~219 가운데 병 20칸
+  { to: 239, counts: [8, 3, 3, 2, 2], tallCap: 20 },   // 220~239
+  { to: 259, counts: [6, 4, 4, 3, 1], tallCap: 20 },   // 240~259
+  { to: 279, counts: [5, 4, 4, 3, 2], tallCap: 20 },   // 260~279
+  { to: 299, counts: [9, 3, 3, 2, 1], tallCap: 20 },   // 280~299
+  { to: 320, counts: [7, 3, 3, 2, 2], tallCap: 24 },   // 300~320 가운데 병 24칸
+  { to: 340, counts: [6, 4, 4, 2, 1], tallCap: 24 },   // 321~340
+  { to: 360, counts: [5, 4, 4, 3, 1], tallCap: 24 },   // 341~360
+  { to: 0,   counts: [8, 3, 3, 2, 1], tallCap: 24 }    // 361+  가장 빡빡한 판(끝없이 이어짐)
+];
+/* 레벨에 맞는 구간을 찾고, 361레벨 이후는 마지막 네 구간을 계속 돌려 쓴다 */
+function hardBand(level) {
+  var i, b = HARD_BANDS[HARD_BANDS.length - 1];
+  for (i = 0; i < HARD_BANDS.length; i++) {
+    if (!HARD_BANDS[i].to || level <= HARD_BANDS[i].to) { b = HARD_BANDS[i]; break; }
+  }
+  if (level > 360) {
+    var tail = HARD_BANDS.slice(HARD_BANDS.length - 4);
+    b = tail[(level - 361) % tail.length];
+  }
+  return [b.counts, b.tallCap];
 }
 
 /* 색별 병 수(counts)를 시드에 맞춰 색에 배분 (매 판 다른 조합) */
@@ -2925,29 +3002,36 @@ var Room = (function () {
   /* 일러스트 자산 — 저장소 기준 상대 경로 (Vercel·정적 호스팅·로컬 모두 동일) */
   var ASSET = './assets/';
 
-  /* ---------- 방 등급 — 20단계 ----------
-     bg: 단계마다 1장씩 다른 배경 일러스트(assets/). 한 단계 오를 때마다 방 그림이 눈에 띄게 달라진다. */
+  /* ---------- 방 등급 — 26단계 ----------
+     bg: 단계마다 1장씩 다른 배경 일러스트(assets/). 한 단계 오를 때마다 방 그림이 눈에 띄게 달라진다.
+     21단계부터는 마지막 배경(황금 궁전)에 단계별 빛(HUD tint)을 덧입힌 '팰리스' 방이다. */
   var RG = [
     { n: 1,  name: '낡은 단칸방',       sub: '찢어진 벽지 · 알전구 · 낡은 마루', price: 0,    cap: 1, bg: 'stage01.webp' },
-    { n: 2,  name: '정리한 고시원',     sub: '닦은 장판 · 벽시계 · 정리된 선반',  price: 120, reqLv: 5,  cap: 1, bg: 'stage02.webp' },
-    { n: 3,  name: '골목 반지하',       sub: '반달 창 · 달빛 한 줄',             price: 210, reqLv: 10,  cap: 1, bg: 'stage03.webp' },
-    { n: 4,  name: '볕 드는 옥탑방',    sub: '옥상 빨랫줄 · 창가 햇살',          price: 300, reqLv: 15,  cap: 2, bg: 'stage04.webp' },
-    { n: 5,  name: '햇살 원룸',         sub: '밝은 벽지 · 하늘 창',              price: 390, reqLv: 20,  cap: 2, bg: 'stage05.webp' },
-    { n: 6,  name: '복층 스튜디오',     sub: '사다리 선반 · 높은 창',            price: 500, reqLv: 25,  cap: 3, bg: 'stage06.webp' },
-    { n: 7,  name: '감성 오피스텔',     sub: '스트링 라이트 · 무드등',           price: 620, reqLv: 30,  cap: 3, bg: 'stage07.webp' },
-    { n: 8,  name: '아늑한 투룸',       sub: '아치 창 · 노을 · 벽난로',          price: 750, reqLv: 35,  cap: 3, bg: 'stage08.webp' },
-    { n: 9,  name: '화분 가득 테라스',  sub: '테라스 화단 · 넝쿨',               price: 890, reqLv: 40,  cap: 4, bg: 'stage09.webp' },
-    { n: 10, name: '노을 뷰 하우스',    sub: '긴 창으로 드는 저녁 빛',           price: 1040, reqLv: 45, cap: 4, bg: 'stage10.webp' },
-    { n: 11, name: '루프탑 아파트',     sub: '밤하늘 · 도시 야경',               price: 1200, reqLv: 50, cap: 4, bg: 'stage11.webp' },
-    { n: 12, name: '모던 펜트하우스',   sub: '대리석 바닥 · 다운라이트',          price: 1370, reqLv: 55, cap: 4, bg: 'stage12.webp' },
-    { n: 13, name: '시티뷰 스위트',     sub: '통창 프레임 · 반사빛',             price: 1550, reqLv: 60, cap: 5, bg: 'stage13.webp' },
-    { n: 14, name: '하이엔드 빌라',     sub: '아트월 · 우아한 소품',             price: 1740, reqLv: 65, cap: 5, bg: 'stage14.webp' },
-    { n: 15, name: '가든 저택',         sub: '정원 넝쿨 · 바닥 화분',            price: 1940, reqLv: 70, cap: 5, bg: 'stage15.webp' },
-    { n: 16, name: '로열 타운하우스',   sub: '기둥 · 레드 커튼',                 price: 2150, reqLv: 75, cap: 5, bg: 'stage16.webp' },
-    { n: 17, name: '그랜드 저택',       sub: '샹들리에 · 금장 몰딩',             price: 2370, reqLv: 80, cap: 5, bg: 'stage17.webp' },
-    { n: 18, name: '로열 팰리스',       sub: '황금 벽 · 붉은 융단',               price: 2600, reqLv: 85, cap: 5, bg: 'stage18.webp' },
-    { n: 19, name: '황금 궁궐',         sub: '황금 기둥 · 레드 카펫',             price: 2840, reqLv: 90, cap: 5, bg: 'stage19.webp' },
-    { n: 20, name: '전설의 크라운 팰리스', sub: '왕관 홀 · 황금 빛',              price: 3090, reqLv: 95, cap: 5, bg: 'stage20.webp' }
+    { n: 2,  name: '정리한 고시원',     sub: '닦은 장판 · 벽시계 · 정리된 선반',  price: 260,  reqLv: 6,   cap: 1, bg: 'stage02.webp' },
+    { n: 3,  name: '골목 반지하',       sub: '반달 창 · 달빛 한 줄',             price: 460,  reqLv: 14,  cap: 1, bg: 'stage03.webp' },
+    { n: 4,  name: '볕 드는 옥탑방',    sub: '옥상 빨랫줄 · 창가 햇살',          price: 660,  reqLv: 22,  cap: 2, bg: 'stage04.webp' },
+    { n: 5,  name: '햇살 원룸',         sub: '밝은 벽지 · 하늘 창',              price: 860,  reqLv: 30,  cap: 2, bg: 'stage05.webp' },
+    { n: 6,  name: '복층 스튜디오',     sub: '사다리 선반 · 높은 창',            price: 1100, reqLv: 38,  cap: 3, bg: 'stage06.webp' },
+    { n: 7,  name: '감성 오피스텔',     sub: '스트링 라이트 · 무드등',           price: 1370, reqLv: 46,  cap: 3, bg: 'stage07.webp' },
+    { n: 8,  name: '아늑한 투룸',       sub: '아치 창 · 노을 · 벽난로',          price: 1650, reqLv: 54,  cap: 3, bg: 'stage08.webp' },
+    { n: 9,  name: '화분 가득 테라스',  sub: '테라스 화단 · 넝쿨',               price: 1960, reqLv: 62,  cap: 4, bg: 'stage09.webp' },
+    { n: 10, name: '노을 뷰 하우스',    sub: '긴 창으로 드는 저녁 빛',           price: 2290, reqLv: 70,  cap: 4, bg: 'stage10.webp' },
+    { n: 11, name: '루프탑 아파트',     sub: '밤하늘 · 도시 야경',               price: 2650, reqLv: 78,  cap: 4, bg: 'stage11.webp' },
+    { n: 12, name: '모던 펜트하우스',   sub: '대리석 바닥 · 다운라이트',          price: 3010, reqLv: 86,  cap: 4, bg: 'stage12.webp' },
+    { n: 13, name: '시티뷰 스위트',     sub: '통창 프레임 · 반사빛',             price: 3410, reqLv: 94,  cap: 5, bg: 'stage13.webp' },
+    { n: 14, name: '하이엔드 빌라',     sub: '아트월 · 우아한 소품',             price: 3830, reqLv: 102, cap: 5, bg: 'stage14.webp' },
+    { n: 15, name: '가든 저택',         sub: '정원 넝쿨 · 바닥 화분',            price: 4270, reqLv: 110, cap: 5, bg: 'stage15.webp' },
+    { n: 16, name: '로열 타운하우스',   sub: '기둥 · 레드 커튼',                 price: 4730, reqLv: 118, cap: 5, bg: 'stage16.webp' },
+    { n: 17, name: '그랜드 저택',       sub: '샹들리에 · 금장 몰딩',             price: 5210, reqLv: 126, cap: 5, bg: 'stage17.webp' },
+    { n: 18, name: '로열 팰리스',       sub: '황금 벽 · 붉은 융단',               price: 5720, reqLv: 134, cap: 5, bg: 'stage18.webp' },
+    { n: 19, name: '황금 궁궐',         sub: '황금 기둥 · 레드 카펫',             price: 6250, reqLv: 142, cap: 5, bg: 'stage19.webp' },
+    { n: 20, name: '전설의 크라운 팰리스', sub: '왕관 홀 · 황금 빛',              price: 6900, reqLv: 150, cap: 5, bg: 'stage20.webp' },
+    { n: 21, name: '별빛 팰리스',       sub: '왕관 홀 · 쏟아지는 별빛',          price: 7800, reqLv: 164, cap: 5, bg: 'stage20.webp', tint: 'star' },
+    { n: 22, name: '오로라 팰리스',     sub: '왕관 홀 · 초록 오로라',            price: 8800, reqLv: 178, cap: 5, bg: 'stage20.webp', tint: 'aurora' },
+    { n: 23, name: '노을 황금궁',       sub: '왕관 홀 · 붉게 물든 노을',          price: 9900, reqLv: 192, cap: 5, bg: 'stage20.webp', tint: 'sunset' },
+    { n: 24, name: '달빛 크라운 팰리스', sub: '왕관 홀 · 은빛 달빛',             price: 11100, reqLv: 206, cap: 5, bg: 'stage20.webp', tint: 'moon' },
+    { n: 25, name: '천상의 팰리스',     sub: '왕관 홀 · 구름 위 하늘빛',          price: 12400, reqLv: 222, cap: 5, bg: 'stage20.webp', tint: 'sky' },
+    { n: 26, name: '영원의 크라운 팰리스', sub: '영원히 빛나는 황금 왕관 홀',     price: 13800, reqLv: 240, cap: 5, bg: 'stage20.webp', tint: 'eternal' }
   ];
   /* 예전 5단계 저장을 새 단계로 이사시킨다 (해금한 방은 그대로 유지) */
   var GRADE_OLD = { 1: 1, 2: 5, 3: 8, 4: 12, 5: 19 };
@@ -2956,130 +3040,130 @@ var Room = (function () {
   /* ---------- 펫 품종 (고양이 8 · 강아지 8) ---------- */
   var BREEDS = [
     { id: 'cat_cheese',  kind: 'cat', name: '치즈태비',      def: '치즈', price: 0,    tag: '노란 줄무늬 · 새침' },
-    { id: 'cat_tuxedo',  kind: 'cat', name: '턱시도',        def: '턱시', price: 300,  tag: '검정 털 · 하얀 가슴' },
-    { id: 'cat_blue',    kind: 'cat', name: '러시안블루',    def: '블루', price: 480,  tag: '회청색 · 초록 눈' },
-    { id: 'cat_siam',    kind: 'cat', name: '샴',            def: '샴',   price: 600,  tag: '갈색 마스크 · 파란 눈' },
-    { id: 'cat_calico',  kind: 'cat', name: '삼색냥',        def: '삼색', price: 760,  tag: '복 많이 받는 무늬' },
-    { id: 'cat_fold',    kind: 'cat', name: '스코티시폴드',  def: '폴드', price: 920,  tag: '접힌 귀 · 동그란 얼굴' },
-    { id: 'cat_persian', kind: 'cat', name: '페르시안',      def: '페리', price: 1150, tag: '복슬복슬 장모' },
-    { id: 'cat_black',   kind: 'cat', name: '깜냥이',        def: '깜냥', price: 1350, tag: '올블랙 · 노란 눈' },
+    { id: 'cat_tuxedo',  kind: 'cat', name: '턱시도',        def: '턱시', price: 660,  tag: '검정 털 · 하얀 가슴' },
+    { id: 'cat_blue',    kind: 'cat', name: '러시안블루',    def: '블루', price: 1060,  tag: '회청색 · 초록 눈' },
+    { id: 'cat_siam',    kind: 'cat', name: '샴',            def: '샴',   price: 1320,  tag: '갈색 마스크 · 파란 눈' },
+    { id: 'cat_calico',  kind: 'cat', name: '삼색냥',        def: '삼색', price: 1670,  tag: '복 많이 받는 무늬' },
+    { id: 'cat_fold',    kind: 'cat', name: '스코티시폴드',  def: '폴드', price: 2020,  tag: '접힌 귀 · 동그란 얼굴' },
+    { id: 'cat_persian', kind: 'cat', name: '페르시안',      def: '페리', price: 2530, tag: '복슬복슬 장모' },
+    { id: 'cat_black',   kind: 'cat', name: '깜냥이',        def: '깜냥', price: 2970, tag: '올블랙 · 노란 눈' },
 
     { id: 'dog_maltese',   kind: 'dog', name: '말티즈',      def: '말랑', price: 0,    tag: '하얀 장모 · 촉촉한 눈' },
-    { id: 'dog_bichon',    kind: 'dog', name: '비숑',        def: '비숑', price: 300,  tag: '솜사탕 곱슬' },
-    { id: 'dog_poodle',    kind: 'dog', name: '푸들',        def: '푸들', price: 480,  tag: '살구빛 곱슬 · 폼폼' },
-    { id: 'dog_corgi',     kind: 'dog', name: '웰시코기',    def: '코기', price: 640,  tag: '짧은 다리 · 큰 귀' },
-    { id: 'dog_shiba',     kind: 'dog', name: '시바견',      def: '시바', price: 800,  tag: '붉은 털 · 쭈그린 미소' },
-    { id: 'dog_retriever', kind: 'dog', name: '골든리트리버', def: '골든', price: 1000, tag: '금빛 장모 · 다정' },
-    { id: 'dog_pomeranian', kind: 'dog', name: '포메라니안', def: '포메', price: 1200, tag: '폭신한 술 털' },
-    { id: 'dog_dachshund', kind: 'dog', name: '닥스훈트',    def: '닥스', price: 1350, tag: '긴 몸 · 쳐진 귀' }
+    { id: 'dog_bichon',    kind: 'dog', name: '비숑',        def: '비숑', price: 660,  tag: '솜사탕 곱슬' },
+    { id: 'dog_poodle',    kind: 'dog', name: '푸들',        def: '푸들', price: 1060,  tag: '살구빛 곱슬 · 폼폼' },
+    { id: 'dog_corgi',     kind: 'dog', name: '웰시코기',    def: '코기', price: 1410,  tag: '짧은 다리 · 큰 귀' },
+    { id: 'dog_shiba',     kind: 'dog', name: '시바견',      def: '시바', price: 1760,  tag: '붉은 털 · 쭈그린 미소' },
+    { id: 'dog_retriever', kind: 'dog', name: '골든리트리버', def: '골든', price: 2200, tag: '금빛 장모 · 다정' },
+    { id: 'dog_pomeranian', kind: 'dog', name: '포메라니안', def: '포메', price: 2640, tag: '폭신한 술 털' },
+    { id: 'dog_dachshund', kind: 'dog', name: '닥스훈트',    def: '닥스', price: 2970, tag: '긴 몸 · 쳐진 귀' }
   ];
 
   /* ---------- 꾸미기 아이템 ---------- */
   var ITEMS = [
     /* ---- 반려동물: 모자·안경 15종 ---- */
-    { id: 'hat_none',     slot: 'hat',    name: '맨얼굴',           price: 0,   req: 1,  tag: '기본' },
-    { id: 'hat_paper',    slot: 'hat',    name: '신문지 모자',      price: 70,  req: 4,  tag: '소박' },
-    { id: 'hat_ribbon',   slot: 'hat',    name: '핑크 리본 머리띠', price: 110, req: 7,  tag: '발랄' },
-    { id: 'hat_beret',    slot: 'hat',    name: '빨간 베레모',      price: 150, req: 10, tag: '감성' },
-    { id: 'hat_cap',      slot: 'hat',    name: '야구 모자',        price: 190, req: 13, tag: '산책' },
-    { id: 'hat_straw',    slot: 'hat',    name: '밀짚모자',         price: 240, req: 17, tag: '여름' },
-    { id: 'hat_glasses',  slot: 'hat',    name: '선글라스',         price: 260, req: 18, tag: '모던' },
-    { id: 'hat_round',    slot: 'hat',    name: '동그란 금테 안경', price: 300, req: 23, tag: '지적인' },
-    { id: 'hat_heart',    slot: 'hat',    name: '하트 선글라스',    price: 340, req: 27, tag: '큐트' },
-    { id: 'hat_bunny',    slot: 'hat',    name: '토끼 귀 머리띠',   price: 380, req: 33, tag: '까까' },
-    { id: 'hat_catseye',  slot: 'hat',    name: '레트로 캣아이 선글라스', price: 420, req: 38, tag: '레트로' },
-    { id: 'hat_chef',     slot: 'hat',    name: '셰프 모자',        price: 460, req: 45, tag: '요리사' },
-    { id: 'hat_star',     slot: 'hat',    name: '별 모양 파티 선글라스', price: 500, req: 52, tag: '파티' },
-    { id: 'hat_wizard',   slot: 'hat',    name: '마법사 모자',      price: 560, req: 64, tag: '마법' },
-    { id: 'hat_crown',    slot: 'hat',    name: '황금 왕관',        price: 600, req: 72, tag: '궁궐' },
+    { id: 'hat_none',         slot: 'hat',      name: '맨얼굴',                 price:    0, req:   1, tag: '기본' },
+    { id: 'hat_paper',        slot: 'hat',      name: '신문지 모자',            price:  140, req:   4, tag: '소박' },
+    { id: 'hat_ribbon',       slot: 'hat',      name: '핑크 리본 머리띠',       price:  220, req:   7, tag: '발랄' },
+    { id: 'hat_beret',        slot: 'hat',      name: '빨간 베레모',            price:  300, req:  10, tag: '감성' },
+    { id: 'hat_cap',          slot: 'hat',      name: '야구 모자',              price:  380, req:  16, tag: '산책' },
+    { id: 'hat_straw',        slot: 'hat',      name: '밀짚모자',               price:  530, req:  23, tag: '여름' },
+    { id: 'hat_glasses',      slot: 'hat',      name: '선글라스',               price:  570, req:  25, tag: '모던' },
+    { id: 'hat_round',        slot: 'hat',      name: '동그란 금테 안경',       price:  660, req:  35, tag: '지적인' },
+    { id: 'hat_heart',        slot: 'hat',      name: '하트 선글라스',          price:  750, req:  42, tag: '큐트' },
+    { id: 'hat_bunny',        slot: 'hat',      name: '토끼 귀 머리띠',         price:  840, req:  54, tag: '까까' },
+    { id: 'hat_catseye',      slot: 'hat',      name: '레트로 캣아이 선글라스', price:  920, req:  63, tag: '레트로' },
+    { id: 'hat_chef',         slot: 'hat',      name: '셰프 모자',              price: 1010, req:  76, tag: '요리사' },
+    { id: 'hat_star',         slot: 'hat',      name: '별 모양 파티 선글라스',  price: 1200, req:  90, tag: '파티' },
+    { id: 'hat_wizard',       slot: 'hat',      name: '마법사 모자',            price: 1340, req: 113, tag: '마법' },
+    { id: 'hat_crown',        slot: 'hat',      name: '황금 왕관',              price: 1440, req: 128, tag: '궁궐' },
 
     /* ---- 반려동물: 의상 12종 ---- */
-    { id: 'outfit_none',  slot: 'outfit', name: '벗은 모습',        price: 0,   req: 1,  tag: '기본' },
-    { id: 'outfit_rag',   slot: 'outfit', name: '거적때기',         price: 0,   req: 1,  tag: '기본' },
-    { id: 'outfit_tee',   slot: 'outfit', name: '줄무늬 티',        price: 110, req: 5,  tag: '소박' },
-    { id: 'outfit_rain',  slot: 'outfit', name: '노란 우비',        price: 170, req: 9,  tag: '비 오는 날' },
-    { id: 'outfit_overall', slot: 'outfit', name: '청 멜빵바지',    price: 300, req: 16, tag: '발랑발랑' },
-    { id: 'outfit_hoodie', slot: 'outfit', name: '아늑한 후드티',   price: 360, req: 24, tag: '포근' },
-    { id: 'outfit_tux',   slot: 'outfit', name: '리본 턱시도',      price: 240, req: 26, tag: '럭셔리' },
-    { id: 'outfit_sailor', slot: 'outfit', name: '세일러복',        price: 420, req: 34, tag: '바다' },
-    { id: 'outfit_dino',  slot: 'outfit', name: '공룡 잠옷',        price: 480, req: 46, tag: '잠자리' },
-    { id: 'outfit_trench', slot: 'outfit', name: '탐정 트렌치코트',  price: 560, req: 58, tag: '탐정' },
-    { id: 'outfit_cape',  slot: 'outfit', name: '로열 망토',        price: 520, req: 75, tag: '궁궐' },
-    { id: 'outfit_star',  slot: 'outfit', name: '별빛 드레스',      price: 740, req: 88, tag: '별밤' },
+    { id: 'outfit_none',      slot: 'outfit',   name: '벗은 모습',              price:    0, req:   1, tag: '기본' },
+    { id: 'outfit_rag',       slot: 'outfit',   name: '거적때기',               price:    0, req:   1, tag: '기본' },
+    { id: 'outfit_tee',       slot: 'outfit',   name: '줄무늬 티',              price:  220, req:   5, tag: '소박' },
+    { id: 'outfit_rain',      slot: 'outfit',   name: '노란 우비',              price:  340, req:   9, tag: '비 오는 날' },
+    { id: 'outfit_overall',   slot: 'outfit',   name: '청 멜빵바지',            price:  660, req:  21, tag: '발랑발랑' },
+    { id: 'outfit_hoodie',    slot: 'outfit',   name: '아늑한 후드티',          price:  790, req:  37, tag: '포근' },
+    { id: 'outfit_tux',       slot: 'outfit',   name: '리본 턱시도',            price:  530, req:  40, tag: '럭셔리' },
+    { id: 'outfit_sailor',    slot: 'outfit',   name: '세일러복',               price:  920, req:  56, tag: '바다' },
+    { id: 'outfit_dino',      slot: 'outfit',   name: '공룡 잠옷',              price: 1060, req:  78, tag: '잠자리' },
+    { id: 'outfit_trench',    slot: 'outfit',   name: '탐정 트렌치코트',        price: 1340, req: 101, tag: '탐정' },
+    { id: 'outfit_cape',      slot: 'outfit',   name: '로열 망토',              price: 1250, req: 134, tag: '궁궐' },
+    { id: 'outfit_star',      slot: 'outfit',   name: '별빛 드레스',            price: 1780, req: 158, tag: '별밤' },
 
     /* ---- 방: 벽장식 8종 (벽에 거는 장식 — 벽지 대신) ---- */
-    { id: 'wd_none',      slot: 'walldeco', name: '장식 없음',       price: 0,   req: 1,  tag: '기본' },
-    { id: 'wd_garland',   slot: 'walldeco', name: '종이 가랜드',     price: 90,  req: 4,  tag: '소박' },
-    { id: 'wd_poster',    slot: 'walldeco', name: '고양이 캘린더',   price: 150, req: 11, tag: '아기자기' },
-    { id: 'wd_clock',     slot: 'walldeco', name: '빈티지 벽시계',   price: 230, req: 19, tag: '빈티지' },
-    { id: 'wd_dream',     slot: 'walldeco', name: '드림캐처',        price: 330, req: 28, tag: '몽환' },
-    { id: 'wd_curtain',   slot: 'walldeco', name: '체크 커튼',       price: 430, req: 40, tag: '아늑' },
-    { id: 'wd_fairy',     slot: 'walldeco', name: '별빛 줄조명',     price: 560, req: 55, tag: '네온' },
-    { id: 'wd_laurel',    slot: 'walldeco', name: '황금 월계수 휘장', price: 720, req: 70, tag: '궁궐' },
+    { id: 'wd_none',          slot: 'walldeco', name: '장식 없음',              price:    0, req:   1, tag: '기본' },
+    { id: 'wd_garland',       slot: 'walldeco', name: '종이 가랜드',            price:  180, req:   4, tag: '소박' },
+    { id: 'wd_poster',        slot: 'walldeco', name: '고양이 캘린더',          price:  300, req:  12, tag: '아기자기' },
+    { id: 'wd_clock',         slot: 'walldeco', name: '빈티지 벽시계',          price:  510, req:  27, tag: '빈티지' },
+    { id: 'wd_dream',         slot: 'walldeco', name: '드림캐처',               price:  730, req:  44, tag: '몽환' },
+    { id: 'wd_curtain',       slot: 'walldeco', name: '체크 커튼',              price:  950, req:  67, tag: '아늑' },
+    { id: 'wd_fairy',         slot: 'walldeco', name: '별빛 줄조명',            price: 1340, req:  96, tag: '네온' },
+    { id: 'wd_laurel',        slot: 'walldeco', name: '황금 월계수 휘장',       price: 1730, req: 124, tag: '궁궐' },
 
     /* ---- 방: 벽지 8종 (지금은 쓰지 않는 옛 그림 — 상점에는 안 나온다) ---- */
-    { id: 'wall_old',     slot: 'wall',    name: '낡은 벽지',        price: 0,   req: 1,  tag: '기본' },
-    { id: 'wall_cream',   slot: 'wall',    name: '크림 플로럴',      price: 90,  req: 8,  tag: '소박' },
-    { id: 'wall_mint',    slot: 'wall',    name: '민트 스트라이프',  price: 160, req: 16, tag: '산뜻' },
-    { id: 'wall_blue',    slot: 'wall',    name: '블루 체크',        price: 240, req: 24, tag: '아늑' },
-    { id: 'wall_rose',    slot: 'wall',    name: '로즈 플로럴',      price: 340, req: 35, tag: '감성' },
-    { id: 'wall_brick',   slot: 'wall',    name: '테라코타 벽돌',    price: 460, req: 48, tag: '빈티지' },
-    { id: 'wall_star',    slot: 'wall',    name: '별빛 밤벽지',      price: 640, req: 70, tag: '몽환' },
-    { id: 'wall_gold',    slot: 'wall',    name: '황금 다마스크',    price: 900, req: 95, tag: '궁궐' },
+    { id: 'wall_old',         slot: 'wall',     name: '낡은 벽지',              price:    0, req:   1, tag: '기본' },
+    { id: 'wall_cream',       slot: 'wall',     name: '크림 플로럴',            price:  180, req:   8, tag: '소박' },
+    { id: 'wall_mint',        slot: 'wall',     name: '민트 스트라이프',        price:  320, req:  21, tag: '산뜻' },
+    { id: 'wall_blue',        slot: 'wall',     name: '블루 체크',              price:  530, req:  37, tag: '아늑' },
+    { id: 'wall_rose',        slot: 'wall',     name: '로즈 플로럴',            price:  750, req:  58, tag: '감성' },
+    { id: 'wall_brick',       slot: 'wall',     name: '테라코타 벽돌',          price: 1010, req:  82, tag: '빈티지' },
+    { id: 'wall_star',        slot: 'wall',     name: '별빛 밤벽지',            price: 1540, req: 124, tag: '몽환' },
+    { id: 'wall_gold',        slot: 'wall',     name: '황금 다마스크',          price: 2160, req: 172, tag: '궁궐' },
 
     /* ---- 방: 침대 8종 ---- */
-    { id: 'bed_box',      slot: 'bed',     name: '라면 박스',        price: 0,    req: 1,  tag: '기본' },
-    { id: 'bed_blanket',  slot: 'bed',     name: '낡은 이불',        price: 120,  req: 6,  tag: '소박' },
-    { id: 'bed_cushion',  slot: 'bed',     name: '푹신한 쿠션',      price: 260,  req: 14, tag: '포근' },
-    { id: 'bed_wood',     slot: 'bed',     name: '원목 침대',        price: 420,  req: 22, tag: '내추럴' },
-    { id: 'bed_sofa',     slot: 'bed',     name: '소파 베드',        price: 600,  req: 34, tag: '아늑' },
-    { id: 'bed_canopy',   slot: 'bed',     name: '공주 캐노피 침대', price: 820,  req: 52, tag: '감성' },
-    { id: 'bed_cloud',    slot: 'bed',     name: '구름 침대',        price: 1100, req: 66, tag: '몽환' },
-    { id: 'bed_throne',   slot: 'bed',     name: '황금 왕좌',        price: 1500, req: 98, tag: '궁궐' },
+    { id: 'bed_box',          slot: 'bed',      name: '라면 박스',              price:    0, req:   1, tag: '기본' },
+    { id: 'bed_blanket',      slot: 'bed',      name: '낡은 이불',              price:  240, req:   6, tag: '소박' },
+    { id: 'bed_cushion',      slot: 'bed',      name: '푹신한 쿠션',            price:  570, req:  18, tag: '포근' },
+    { id: 'bed_wood',         slot: 'bed',      name: '원목 침대',              price:  920, req:  33, tag: '내추럴' },
+    { id: 'bed_sofa',         slot: 'bed',      name: '소파 베드',              price: 1440, req:  56, tag: '아늑' },
+    { id: 'bed_canopy',       slot: 'bed',      name: '공주 캐노피 침대',       price: 1970, req:  90, tag: '감성' },
+    { id: 'bed_cloud',        slot: 'bed',      name: '구름 침대',              price: 2640, req: 116, tag: '몽환' },
+    { id: 'bed_throne',       slot: 'bed',      name: '황금 왕좌',              price: 3600, req: 177, tag: '궁궐' },
 
     /* ---- 방: 액자 7종 ---- */
-    { id: 'frame_empty',  slot: 'frame',   name: '빈 벽',            price: 0,   req: 1,  tag: '기본' },
-    { id: 'frame_photo',  slot: 'frame',   name: '가족사진',         price: 80,  req: 6,  tag: '소박' },
-    { id: 'frame_leaf',   slot: 'frame',   name: '말린 식물',        price: 140, req: 12, tag: '보태니컬' },
-    { id: 'frame_art',    slot: 'frame',   name: '추상 아트',        price: 220, req: 20, tag: '모던' },
-    { id: 'frame_moon',   slot: 'frame',   name: '달빛 그림',        price: 320, req: 32, tag: '몽환' },
-    { id: 'frame_gold',   slot: 'frame',   name: '금테 유화',        price: 460, req: 56, tag: '럭셔리' },
-    { id: 'frame_palace', slot: 'frame',   name: '궁궐 초상화',      price: 680, req: 88, tag: '궁궐' },
+    { id: 'frame_empty',      slot: 'frame',    name: '빈 벽',                  price:    0, req:   1, tag: '기본' },
+    { id: 'frame_photo',      slot: 'frame',    name: '가족사진',               price:  160, req:   6, tag: '소박' },
+    { id: 'frame_leaf',       slot: 'frame',    name: '말린 식물',              price:  280, req:  14, tag: '보태니컬' },
+    { id: 'frame_art',        slot: 'frame',    name: '추상 아트',              price:  480, req:  29, tag: '모던' },
+    { id: 'frame_moon',       slot: 'frame',    name: '달빛 그림',              price:  700, req:  52, tag: '몽환' },
+    { id: 'frame_gold',       slot: 'frame',    name: '금테 유화',              price: 1010, req:  97, tag: '럭셔리' },
+    { id: 'frame_palace',     slot: 'frame',    name: '궁궐 초상화',            price: 1630, req: 158, tag: '궁궐' },
 
     /* ---- 방: 러그 7종 ---- */
-    { id: 'rug_none',     slot: 'rug',     name: '민바닥',           price: 0,   req: 1,  tag: '기본' },
-    { id: 'rug_cream',    slot: 'rug',     name: '크림 러그',        price: 100, req: 7,  tag: '소박' },
-    { id: 'rug_check',    slot: 'rug',     name: '체크 매트',        price: 180, req: 14, tag: '아늑' },
-    { id: 'rug_fluffy',   slot: 'rug',     name: '복실 러그',        price: 280, req: 23, tag: '포근' },
-    { id: 'rug_round',    slot: 'rug',     name: '라운드 자카드',    price: 400, req: 36, tag: '모던' },
-    { id: 'rug_red',      slot: 'rug',     name: '페르시안 카펫',    price: 560, req: 58, tag: '빈티지' },
-    { id: 'rug_gold',     slot: 'rug',     name: '금실 카펫',        price: 780, req: 84, tag: '궁궐' },
+    { id: 'rug_none',         slot: 'rug',      name: '민바닥',                 price:    0, req:   1, tag: '기본' },
+    { id: 'rug_cream',        slot: 'rug',      name: '크림 러그',              price:  200, req:   7, tag: '소박' },
+    { id: 'rug_check',        slot: 'rug',      name: '체크 매트',              price:  360, req:  18, tag: '아늑' },
+    { id: 'rug_fluffy',       slot: 'rug',      name: '복실 러그',              price:  620, req:  35, tag: '포근' },
+    { id: 'rug_round',        slot: 'rug',      name: '라운드 자카드',          price:  880, req:  59, tag: '모던' },
+    { id: 'rug_red',          slot: 'rug',      name: '페르시안 카펫',          price: 1340, req: 101, tag: '빈티지' },
+    { id: 'rug_gold',         slot: 'rug',      name: '금실 카펫',              price: 1870, req: 151, tag: '궁궐' },
 
     /* ---- 방: 조명 7종 ---- */
-    { id: 'light_bulb',   slot: 'light',   name: '기본 조명',        price: 0,   req: 1,  tag: '방 전등' },
-    { id: 'light_stand',  slot: 'light',   name: '스탠드 조명',      price: 130, req: 5,  tag: '소박' },
-    { id: 'light_lantern', slot: 'light',  name: '놋쇠 랜턴',        price: 220, req: 12, tag: '빈티지' },
-    { id: 'light_paper',  slot: 'light',   name: '한지 등',          price: 300, req: 21, tag: '동양' },
-    { id: 'light_globe',  slot: 'light',   name: '구체 조명',        price: 420, req: 33, tag: '모던' },
-    { id: 'light_neon',   slot: 'light',   name: '네온 하트',        price: 620, req: 54, tag: '네온' },
-    { id: 'light_chandelier', slot: 'light', name: '크리스털 샹들리에', price: 860, req: 90, tag: '궁궐' },
+    { id: 'light_bulb',       slot: 'light',    name: '기본 조명',              price:    0, req:   1, tag: '방 전등' },
+    { id: 'light_stand',      slot: 'light',    name: '스탠드 조명',            price:  260, req:   5, tag: '소박' },
+    { id: 'light_lantern',    slot: 'light',    name: '놋쇠 랜턴',              price:  480, req:  14, tag: '빈티지' },
+    { id: 'light_paper',      slot: 'light',    name: '한지 등',                price:  660, req:  31, tag: '동양' },
+    { id: 'light_globe',      slot: 'light',    name: '구체 조명',              price:  920, req:  54, tag: '모던' },
+    { id: 'light_neon',       slot: 'light',    name: '네온 하트',              price: 1490, req:  94, tag: '네온' },
+    { id: 'light_chandelier', slot: 'light',    name: '크리스털 샹들리에',      price: 2060, req: 162, tag: '궁궐' },
 
     /* ---- 방: 소품 15종 (반려동물 용품 포함) ---- */
-    { id: 'deco_none',    slot: 'deco',    name: '빈 공간',          price: 0,   req: 1,  tag: '기본' },
-    { id: 'deco_toys',    slot: 'deco',    name: '장난감 바구니',    price: 90,  req: 3,  tag: '공놀이' },
-    { id: 'deco_plant',   slot: 'deco',    name: '대형 화분',        price: 150, req: 7,  tag: '푸르름' },
-    { id: 'deco_bowl',    slot: 'deco',    name: '밥그릇·급수기 세트', price: 170, req: 9,  tag: '식사' },
-    { id: 'deco_shelf',   slot: 'deco',    name: '미니 선반',        price: 260, req: 15, tag: '아늑' },
-    { id: 'deco_snuffle', slot: 'deco',    name: '노즈워크 매트',    price: 300, req: 18, tag: '코놀이' },
-    { id: 'deco_cushion', slot: 'deco',    name: '쿠션 더미',        price: 380, req: 25, tag: '포근' },
-    { id: 'deco_tunnel',  slot: 'deco',    name: '고양이 터널',      price: 430, req: 30, tag: '숨숨' },
-    { id: 'deco_basket',  slot: 'deco',    name: '바구니 화분',      price: 520, req: 40, tag: '보태니컬' },
-    { id: 'deco_scratch', slot: 'deco',    name: '스크래처 & 낚싯대', price: 560, req: 44, tag: '할퀴기' },
-    { id: 'deco_doghouse', slot: 'deco',   name: '강아지 원목 하우스', price: 680, req: 56, tag: '내 집' },
-    { id: 'deco_gramophone', slot: 'deco', name: '축음기',           price: 700, req: 62, tag: '빈티지' },
-    { id: 'deco_wheel',   slot: 'deco',    name: '우드 캣휠',        price: 780, req: 68, tag: '달리기' },
-    { id: 'deco_aquarium', slot: 'deco',   name: '미니 어항',        price: 900, req: 92, tag: '럭셔리' },
-    { id: 'deco_cattower', slot: 'deco',   name: '원목 캣타워',      price: 950, req: 94, tag: '고양이방' }
+    { id: 'deco_none',        slot: 'deco',     name: '빈 공간',                price:    0, req:   1, tag: '기본' },
+    { id: 'deco_toys',        slot: 'deco',     name: '장난감 바구니',          price:  180, req:   3, tag: '공놀이' },
+    { id: 'deco_plant',       slot: 'deco',     name: '대형 화분',              price:  300, req:   7, tag: '푸르름' },
+    { id: 'deco_bowl',        slot: 'deco',     name: '밥그릇·급수기 세트',     price:  340, req:   9, tag: '식사' },
+    { id: 'deco_shelf',       slot: 'deco',     name: '미니 선반',              price:  570, req:  20, tag: '아늑' },
+    { id: 'deco_snuffle',     slot: 'deco',     name: '노즈워크 매트',          price:  660, req:  25, tag: '코놀이' },
+    { id: 'deco_cushion',     slot: 'deco',     name: '쿠션 더미',              price:  840, req:  38, tag: '포근' },
+    { id: 'deco_tunnel',      slot: 'deco',     name: '고양이 터널',            price:  950, req:  48, tag: '숨숨' },
+    { id: 'deco_basket',      slot: 'deco',     name: '바구니 화분',            price: 1250, req:  67, tag: '보태니컬' },
+    { id: 'deco_scratch',     slot: 'deco',     name: '스크래처 & 낚싯대',      price: 1340, req:  75, tag: '할퀴기' },
+    { id: 'deco_doghouse',    slot: 'deco',     name: '강아지 원목 하우스',     price: 1630, req:  97, tag: '내 집' },
+    { id: 'deco_gramophone',  slot: 'deco',     name: '축음기',                 price: 1680, req: 109, tag: '빈티지' },
+    { id: 'deco_wheel',       slot: 'deco',     name: '우드 캣휠',              price: 1870, req: 120, tag: '달리기' },
+    { id: 'deco_aquarium',    slot: 'deco',     name: '미니 어항',              price: 2160, req: 166, tag: '럭셔리' },
+    { id: 'deco_cattower',    slot: 'deco',     name: '원목 캣타워',            price: 2280, req: 170, tag: '고양이방' },
   ];
 
   var TABS = [
@@ -3123,7 +3207,8 @@ var Room = (function () {
     return o;
   }
 
-  var RS = { coins: 0, grade: 1, maxGrade: 1, pets: [], lead: 0, owned: {}, equipped: defaultEquipped() };
+  /* out: 방에서 빼 둔 친구(펫 id → 1). 입양 기록은 그대로 두고 방에만 안 부른 상태 */
+  var RS = { coins: 0, grade: 1, maxGrade: 1, pets: [], lead: 0, out: {}, owned: {}, equipped: defaultEquipped() };
   var curTab = 'pets';
   var decoSlot = 'walldeco';
   /* 미리보기 — 칸(슬롯)마다 따로 기억해서 침대·모자·의상·조명을 겹쳐 코디해 볼 수 있다 */
@@ -3147,6 +3232,9 @@ var Room = (function () {
     store('wsp.room.equipped', JSON.stringify(RS.equipped));
     store('wsp.room.pets', JSON.stringify(RS.pets));
     store('wsp.room.lead', String(RS.lead));
+    var outs = [], oi;
+    for (oi = 0; oi < RS.pets.length; oi++) if (RS.out[RS.pets[oi].id]) outs.push(RS.pets[oi].id);
+    store('wsp.room.out', JSON.stringify(outs));
   }
   function load() {
     RS.coins = Math.max(0, num(store('wsp.coins'), 0));
@@ -3256,6 +3344,17 @@ var Room = (function () {
     }
     RS.lead = Math.min(Math.max(0, num(store('wsp.room.lead'), 0)), Math.max(0, RS.pets.length - 1));
 
+    /* 방에서 빼 둔 친구 — 없던 저장(처음 쓰는 새 형식)이면 모두 방에 있는 상태 */
+    var outs = readJSON('wsp.room.out', null), oi, pid, has = {};
+    for (oi = 0; oi < RS.pets.length; oi++) has[RS.pets[oi].id] = 1;
+    RS.out = {};
+    if (Object.prototype.toString.call(outs) === '[object Array]') {
+      for (oi = 0; oi < outs.length; oi++) {
+        pid = num(outs[oi], -1);
+        if (has[pid]) RS.out[pid] = 1;
+      }
+    }
+
     /* 처음 꾸미기 세이브가 만들어질 때 — 지금까지 깬 레벨만큼 환영 소급 보너스(상한) */
     if (store('wsp.room.welcome') === null) {
       var lv = Math.max(1, num(store('wsp.level'), 1));
@@ -3283,6 +3382,26 @@ var Room = (function () {
   function hasBreed(id) { for (var i = 0; i < RS.pets.length; i++) if (RS.pets[i].breed === id) return true; return false; }
   function adoptPrice(b) { return RS.pets.length === 0 ? 0 : b.price; }
   function leadIndex() { return Math.min(Math.max(0, RS.lead), Math.max(0, RS.pets.length - 1)); }
+
+  /* ---------- 방에 서 있는 친구 ----------
+     입양한 친구와 '지금 방에 있는 친구'를 나눈다. 빼 둔 친구도 입양 기록·이름·레벨 해금은 그대로다. */
+  function isOut(p) { return !!(p && RS.out[p.id]); }
+  function roomPets() {
+    var list = [], i;
+    for (i = 0; i < RS.pets.length && list.length < 5; i++) if (!isOut(RS.pets[i])) list.push(RS.pets[i]);
+    return list;
+  }
+  function outCount() {
+    var n = 0, i;
+    for (i = 0; i < RS.pets.length; i++) if (isOut(RS.pets[i])) n++;
+    return n;
+  }
+  /* 장면에 그릴 때의 대표 친구 자리 — 대표가 방에 없으면 -1(모자·의상도 안 보인다) */
+  function roomLead() {
+    var lp = RS.pets[leadIndex()], list = roomPets(), i;
+    for (i = 0; i < list.length; i++) if (list[i] === lp) return i;
+    return -1;
+  }
   function cleanName(n, d) {
     var s = (typeof n === 'string' ? n : '').replace(/[\r\n\t]/g, ' ').replace(/\s+/g, ' ').trim();
     return (s || d || '이름없음').slice(0, 8);
@@ -3314,7 +3433,102 @@ var Room = (function () {
      ===================================================================== */
   function baseRoom(u, g) {
     var s = RG[Math.min(RG.length, Math.max(1, g)) - 1] || RG[0];
-    return '<image x="0" y="0" width="360" height="240" preserveAspectRatio="xMidYMid slice" href="' + ASSET + (s.bg || 'stage01.webp') + '"/>';
+    var out = '<image x="0" y="0" width="360" height="240" preserveAspectRatio="xMidYMid slice" href="' + ASSET + (s.bg || 'stage01.webp') + '"/>';
+    /* 21단계 이후 팰리스 — 같은 배경 위에 단계별 빛(색 안개 + 반짝임)을 덧입힌다 */
+    if (s.tint) out += tintLayer(u, s.tint);
+    return out;
+  }
+
+  /* 팰리스 단계의 빛 — 같은 배경 위에 단계마다 다른 하늘을 얹는다.
+     별·오로라·노을·달·구름·황금 빛줄기로 한눈에 구분되되, 방 그림을 가리지 않게 반투명으로. */
+  var TINTS = {
+    star:    { c1: '#3b2f96', a1: .46, c2: '#05051a', a2: .42, dot: '#FFF3C4', dots: 34, seed: 11, big: 1.6 },
+    aurora:  { c1: '#1fd79a', a1: .34, c2: '#221d72', a2: .34, dot: '#D6FFF4', dots: 16, seed: 23, big: 1.8 },
+    sunset:  { c1: '#ff9a3c', a1: .40, c2: '#4a0a30', a2: .38, dot: '#FFE1A8', dots: 20, seed: 37, big: 1.7 },
+    moon:    { c1: '#cfe4ff', a1: .34, c2: '#0b1240', a2: .44, dot: '#FFFFFF', dots: 26, seed: 41, big: 1.2 },
+    sky:     { c1: '#8fdcff', a1: .38, c2: '#16265e', a2: .30, dot: '#FFFFFF', dots: 20, seed: 53, big: 1.5 },
+    eternal: { c1: '#ffe08a', a1: .40, c2: '#3a1d00', a2: .40, dot: '#FFF6C9', dots: 34, seed: 67, big: 1.9 }
+  };
+  function tintLayer(u, kind) {
+    var t = TINTS[kind];
+    if (!t) return '';
+    var s = '<radialGradient id="' + u + 'tg" cx="50%" cy="24%" r="84%">' +
+              '<stop offset="0" stop-color="' + t.c1 + '" stop-opacity="' + t.a1 + '"/>' +
+              '<stop offset="1" stop-color="' + t.c2 + '" stop-opacity="' + t.a2 + '"/></radialGradient>' +
+            '<rect x="0" y="0" width="360" height="240" fill="url(#' + u + 'tg)"/>';
+    var rng = mulberry32(t.seed), i, x, y, r, o;
+
+    if (kind === 'star') {
+      for (i = 0; i < t.dots; i++) {
+        x = 10 + rng() * 340; y = 6 + rng() * 132;
+        r = (0.4 + rng() * t.big).toFixed(2); o = (0.45 + rng() * 0.5).toFixed(2);
+        s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + r + '" fill="' + t.dot + '" opacity="' + o + '"/>';
+      }
+      var big = [[64, 30, 1.5], [150, 18, 1.1], [268, 40, 1.6], [318, 22, 1.0], [204, 58, 1.2]];
+      for (i = 0; i < big.length; i++) {
+        var bx = big[i][0], by = big[i][1], k = big[i][2];
+        s += '<path d="M' + bx + ' ' + (by - 6 * k) + 'L' + (bx + 1.7 * k) + ' ' + (by - 1.7 * k) + 'L' + (bx + 6 * k) + ' ' + by +
+             'L' + (bx + 1.7 * k) + ' ' + (by + 1.7 * k) + 'L' + bx + ' ' + (by + 6 * k) + 'L' + (bx - 1.7 * k) + ' ' + (by + 1.7 * k) +
+             'L' + (bx - 6 * k) + ' ' + by + 'L' + (bx - 1.7 * k) + ' ' + (by - 1.7 * k) + 'Z" fill="#FFFBDF" opacity=".82"/>';
+      }
+    } else if (kind === 'aurora') {
+      s += '<path d="M-10 34Q80 2 180 30T370 18V78Q270 52 180 76T-10 62Z" fill="#3CF2B4" opacity=".26"/>' +
+           '<path d="M-10 58Q90 30 190 54T370 44V96Q260 78 170 96T-10 86Z" fill="#39C8F0" opacity=".20"/>' +
+           '<path d="M-10 84Q100 58 200 80T370 72V116Q250 104 160 116T-10 108Z" fill="#8E6BFF" opacity=".16"/>';
+      for (i = 0; i < t.dots; i++) {
+        x = 14 + rng() * 332; y = 14 + rng() * 100;
+        s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (0.4 + rng() * 1.1).toFixed(2) + '" fill="' + t.dot + '" opacity="' + (0.3 + rng() * 0.5).toFixed(2) + '"/>';
+      }
+    } else if (kind === 'sunset') {
+      s += '<radialGradient id="' + u + 'sun" cx="76%" cy="34%" r="62%">' +
+             '<stop offset="0" stop-color="#FFC36A" stop-opacity=".85"/>' +
+             '<stop offset=".45" stop-color="#FF8A3C" stop-opacity=".38"/>' +
+             '<stop offset="1" stop-color="#FF5A2A" stop-opacity="0"/></radialGradient>' +
+           '<rect x="0" y="0" width="360" height="240" fill="url(#' + u + 'sun)"/>' +
+           '<circle cx="272" cy="74" r="22" fill="#FFE9B0" opacity=".55"/>' +
+           '<circle cx="272" cy="74" r="34" fill="#FFD37A" opacity=".18"/>';
+      for (i = 0; i < t.dots; i++) {
+        x = 160 + rng() * 190; y = 10 + rng() * 90;
+        s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (0.4 + rng() * 1.2).toFixed(2) + '" fill="' + t.dot + '" opacity="' + (0.3 + rng() * 0.5).toFixed(2) + '"/>';
+      }
+    } else if (kind === 'moon') {
+      s += '<radialGradient id="' + u + 'mo" cx="50%" cy="50%" r="50%">' +
+             '<stop offset="0" stop-color="#FFFDF0" stop-opacity=".55"/>' +
+             '<stop offset="1" stop-color="#FFFDF0" stop-opacity="0"/></radialGradient>' +
+           '<circle cx="288" cy="52" r="46" fill="url(#' + u + 'mo)"/>' +
+           '<circle cx="288" cy="52" r="24" fill="#FFF9DE" opacity=".88"/>' +
+           '<circle cx="281" cy="46" r="4.4" fill="#E8E0C2" opacity=".5"/>' +
+           '<circle cx="296" cy="58" r="3.1" fill="#E8E0C2" opacity=".42"/>';
+      for (i = 0; i < t.dots; i++) {
+        x = 10 + rng() * 340; y = 6 + rng() * 128;
+        s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (0.3 + rng() * 1.1).toFixed(2) + '" fill="' + t.dot + '" opacity="' + (0.3 + rng() * 0.55).toFixed(2) + '"/>';
+      }
+    } else if (kind === 'sky') {
+      function cloud(cx, cy, sc, op) {
+        return '<g opacity="' + op + '" fill="#FFFFFF"><ellipse cx="' + cx + '" cy="' + (cy + 5 * sc) + '" rx="' + (26 * sc) + '" ry="' + (10 * sc) + '"/>' +
+               '<ellipse cx="' + (cx - 13 * sc) + '" cy="' + (cy + 2 * sc) + '" rx="' + (15 * sc) + '" ry="' + (9 * sc) + '"/>' +
+               '<ellipse cx="' + (cx + 14 * sc) + '" cy="' + (cy + 1 * sc) + '" rx="' + (17 * sc) + '" ry="' + (10 * sc) + '"/>' +
+               '<ellipse cx="' + (cx + 2 * sc) + '" cy="' + (cy - 5 * sc) + '" rx="' + (13 * sc) + '" ry="' + (9 * sc) + '"/></g>';
+      }
+      s += cloud(66, 40, 1.15, .30) + cloud(232, 26, .92, .26) + cloud(320, 88, 1.3, .22) + cloud(150, 96, .85, .18);
+      for (i = 0; i < t.dots; i++) {
+        x = 10 + rng() * 340; y = 6 + rng() * 120;
+        s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (0.3 + rng() * 0.9).toFixed(2) + '" fill="' + t.dot + '" opacity="' + (0.25 + rng() * 0.4).toFixed(2) + '"/>';
+      }
+    } else if (kind === 'eternal') {
+      var rays = '', cx0 = 180, cy0 = -18;
+      for (i = 0; i < 16; i++) {
+        var a0 = (i / 16) * Math.PI * 2, a1 = a0 + 0.10;
+        rays += '<path d="M' + cx0 + ' ' + cy0 + 'L' + (cx0 + Math.cos(a0) * 300).toFixed(1) + ' ' + (cy0 + Math.sin(a0) * 300).toFixed(1) +
+                'L' + (cx0 + Math.cos(a1) * 300).toFixed(1) + ' ' + (cy0 + Math.sin(a1) * 300).toFixed(1) + 'Z" fill="#FFE9A8" opacity=".14"/>';
+      }
+      s += rays;
+      for (i = 0; i < t.dots; i++) {
+        x = 10 + rng() * 340; y = 4 + rng() * 140;
+        s += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (0.5 + rng() * t.big).toFixed(2) + '" fill="' + t.dot + '" opacity="' + (0.4 + rng() * 0.5).toFixed(2) + '"/>';
+      }
+    }
+    return s;
   }
 
   /* ---------- 아이템 그림 (모두 100×100 상자 기준) ---------- */
@@ -5206,8 +5420,8 @@ var Room = (function () {
   function curLook(extra) {
     var o = {
       grade: gradePreview || RS.grade,
-      pets: RS.pets.slice(0, 5),
-      lead: leadIndex()
+      pets: roomPets(),
+      lead: roomLead()
     }, i;
     for (i = 0; i < SLOTS.length; i++) o[SLOTS[i].id] = RS.equipped[SLOTS[i].id];
     /* 미구입 아이템 미리보기 — 저장값은 건드리지 않고 이 장면에만 칸별로 덮어쓴다 */
@@ -5231,11 +5445,11 @@ var Room = (function () {
 
   function playerLevel() { return Math.max(1, num(store('wsp.level'), 1)); }
   function levelLocked(it) { return playerLevel() < (it.req || 1); }
-  /* 방 단계 해금 레벨 — 2단계 Lv.5 부터 20단계 Lv.95 까지 5레벨 간격 */
+  /* 방 단계 해금 레벨 — 2단계 Lv.6 부터 20단계 Lv.150, 26단계 Lv.240 까지 */
   function gradeReqLv(g) { return (g && g.reqLv) || 1; }
   function gradeLocked(g) { return playerLevel() < gradeReqLv(g); }
   /* 친구 입양 해금 레벨 — 1번째 무료(Lv.1) · 2번째 15 · 3번째 35 · 4번째 60 · 5번째 85 */
-  var PET_REQ = [1, 15, 35, 60, 85];
+  var PET_REQ = [1, 20, 45, 75, 110];
   function petReqLv() { return PET_REQ[Math.min(RS.pets.length, PET_REQ.length - 1)]; }
   function petLevelLocked() { return playerLevel() < petReqLv(); }
 
@@ -5263,9 +5477,16 @@ var Room = (function () {
     st.className = 'stage-art' + (hasPreview() ? ' pv' : '');
     var g = RG[(gradePreview || RS.grade) - 1];
     if (el('gradeChip')) el('gradeChip').textContent = g.n + '단계 · ' + g.name;
-    if (el('capChip')) el('capChip').textContent = '🐾 ' + RS.pets.length + '/' + capShown();
+    var roomN = roomPets().length, outN = outCount();
+    if (el('capChip')) el('capChip').textContent = '🐾 ' + roomN + '/' + capShown() + (outN ? ' · 밖 ' + outN : '');
     var em = el('stageEmpty');
-    if (em) em.hidden = (RS.pets.length > 0) || hasPreview();
+    if (em) {
+      var none = RS.pets.length === 0;
+      em.hidden = roomN > 0 || hasPreview();
+      if (el('stageEmptyMsg')) el('stageEmptyMsg').textContent = none ? '아직 함께 사는 친구가 없어요' : '방을 비워 두었어요';
+      if (el('btnAdoptFirst')) el('btnAdoptFirst').hidden = !none;
+      if (el('btnBringAll')) el('btnBringAll').hidden = none;
+    }
     renderLock();
   }
 
@@ -5452,23 +5673,35 @@ var Room = (function () {
 
   function petRoster() {
     var i, s = '', n = RS.pets.length, cap = capShown(), lead = leadIndex();
-    s += '<p class="room-hint">' + RS.grade + '단계 방 · 함께 살 수 있는 친구 <b>' + cap + '마리</b> (지금 ' + n + '마리). ' +
+    var inRoom = roomPets().length, outN = outCount();
+    s += '<p class="room-hint">' + RS.grade + '단계 방 · 함께 살 수 있는 친구 <b>' + cap + '마리</b> (지금 ' + n + '마리 · 방에 ' + inRoom + '마리' +
+         (outN ? ' · 방 밖 ' + outN + '마리' : '') + '). ' +
          (n < cap && petLevelLocked() ? ('다음 친구는 <b>Lv.' + petReqLv() + '</b>부터. ') : '') +
          '이름을 눌러 직접 바꿀 수 있어요.</p>';
     if (!n) {
       s += '<p class="room-hint">위 <b>첫 친구 무료 입양</b> 버튼을 눌러 고양이·강아지 중 한 마리를 맞이해 보세요.</p>';
       return s;
     }
+    s += '<div class="prow">' +
+           (outN ? '<button class="ptog" data-allout="in">모두 다시 부르기</button>' : '') +
+           (inRoom ? '<button class="ptog" data-allout="out">모두 방에서 빼기</button>' : '') +
+         '</div>';
+    s += '<p class="room-hint">방에서 빼도 <b>입양 기록·이름은 그대로</b>예요. 언제든 다시 부를 수 있어요.</p>';
     s += '<div class="pets">';
     for (i = 0; i < n; i++) {
-      var p = RS.pets[i], b = breedById(p.breed) || BREEDS[0];
-      s += '<div class="petcard' + (i === lead ? ' on' : '') + '">' +
+      var p = RS.pets[i], b = breedById(p.breed) || BREEDS[0], out = isOut(p);
+      s += '<div class="petcard' + (i === lead ? ' on' : '') + (out ? ' out' : '') + '">' +
         '<div class="av"><img src="' + ASSET + breedImg(p.breed) + '" alt=""></div>' +
         '<div class="info">' +
           '<input class="pname" type="text" maxlength="8" value="' + esc(p.name) + '" data-name="' + i + '" aria-label="' + b.name + ' 이름" autocomplete="off" spellcheck="false" enterkeyhint="done">' +
-          '<small>' + b.name + (i === lead ? ' · 대표 친구 (모자·의상 착용)' : '') + '</small>' +
+          '<small>' + b.name + (i === lead ? ' · 대표 친구 (모자·의상 착용)' : '') + (out ? ' · 방 밖에 있음' : '') + '</small>' +
         '</div>' +
-        (i === lead ? '<span class="leadbadge">대표</span>' : '<button class="leadbtn" data-lead="' + i + '">대표로</button>') +
+        '<div class="pbtns">' +
+          (i === lead ? '<span class="leadbadge">대표</span>' : '<button class="leadbtn" data-lead="' + i + '">대표로</button>') +
+          '<button class="outbtn' + (out ? ' in' : '') + '" data-out="' + i + '" aria-label="' +
+            (out ? b.name + ' 방에 다시 부르기' : b.name + ' 방에서 빼기') + '">' +
+            (out ? '다시 부르기' : '방에서 빼기') + '</button>' +
+        '</div>' +
       '</div>';
     }
     s += '</div>';
@@ -5476,7 +5709,7 @@ var Room = (function () {
       ? ('<p class="room-hint">다음 친구는 <b>Lv.' + petReqLv() + '</b>부터 입양할 수 있어요.</p>')
       : '<p class="room-hint"><b>입양</b> 탭에서 새 품종을 맞이할 수 있어요.</p>';
     else if (RS.maxGrade < GRADE_MAX) s += '<p class="room-hint">지금 방은 가득 찼어요. <b>방</b> 탭에서 이사하면 ' + RG[RS.maxGrade].cap + '마리까지 늘어나요.</p>';
-    else s += '<p class="room-hint">궁궐에는 다섯 친구까지 함께 살 수 있어요.</p>';
+    else s += '<p class="room-hint">가장 넓은 방에는 다섯 친구까지 함께 살 수 있어요.</p>';
     return s;
   }
 
@@ -5514,7 +5747,7 @@ var Room = (function () {
                   (!unlocked && !next ? ' locked' : '') + (lvLock ? ' lvl' : '');
         s += '<div class="' + cls + '" data-grade="' + g.n + '">' +
           (lvLock ? '<span class="tag lv">Lv.' + reqLv + '</span>' : '') +
-          '<div class="pv">' + sceneSvg({ grade: g.n, pets: RS.pets.slice(0, g.cap), lead: leadIndex(), hat: 'hat_none', outfit: 'outfit_rag', bed: 'bed_box', wall: 'wall_old', frame: 'frame_empty', rug: 'rug_none', light: 'light_bulb', deco: 'deco_none' }) + '</div>' +
+          '<div class="pv">' + sceneSvg({ grade: g.n, pets: roomPets().slice(0, g.cap), lead: roomLead(), hat: 'hat_none', outfit: 'outfit_rag', bed: 'bed_box', wall: 'wall_old', frame: 'frame_empty', rug: 'rug_none', light: 'light_bulb', deco: 'deco_none' }) + '</div>' +
           '<div class="info"><b>' + g.n + '단계 · ' + g.name + '</b><small>' + g.sub + ' · 친구 ' + g.cap + '마리</small>' +
           '<span class="pr' + (cur ? ' ok' : (unlocked ? ' ok' : (lvLock ? ' lvreq' : (next ? '' : ' no')))) + '">' + priceTxt + '</span></div>' +
         '</div>';
@@ -5693,6 +5926,8 @@ var Room = (function () {
     RS.coins -= pr;
     RS.pets.push({ id: nextPetId(), breed: b.id, name: b.def });
     if (RS.pets.length === 1) RS.lead = 0;
+    /* 방이 비어 있었거나 대표가 방 밖에 있으면 새 친구가 대표가 된다 */
+    if (roomLead() < 0) RS.lead = RS.pets.length - 1;
     save();
     curTab = 'pets';
     renderAll();
@@ -5715,10 +5950,51 @@ var Room = (function () {
     if (!RS.pets[i]) return;
     if (leadIndex() === i) return;
     RS.lead = i;
+    /* 방 밖에 있던 친구를 대표로 삼으면 방으로도 다시 부른다 (대표 옷·모자가 보이도록) */
+    var wasOut = isOut(RS.pets[i]);
+    if (wasOut) delete RS.out[RS.pets[i].id];
     save();
     renderAll();
     Sound.pick();
-    toast(RS.pets[i].name + '가 대표 친구예요');
+    toast(RS.pets[i].name + '가 대표 친구예요' + (wasOut ? ' · 방으로 다시 불렀어요' : ''));
+  }
+
+  /* ---------- 방에서 빼기 / 다시 부르기 ----------
+     입양 기록은 지우지 않는다. 방에 서 있는 친구만 바꾼다. */
+  function toggleOut(i) {
+    var p = RS.pets[i];
+    if (!p) return;
+    if (isOut(p)) {
+      delete RS.out[p.id];
+      if (roomLead() < 0) RS.lead = i;          // 빈 방이었다면 부른 친구가 대표
+      save();
+      renderAll();
+      Sound.done();
+      toast(p.name + '를 다시 불렀어요');
+    } else {
+      RS.out[p.id] = 1;
+      if (leadIndex() === i) {                   // 대표가 나가면 남은 친구가 대표를 이어받는다
+        var rest = roomPets();
+        RS.lead = rest.length ? RS.pets.indexOf(rest[0]) : i;
+      }
+      save();
+      renderAll();
+      Sound.pick();
+      toast(p.name + '를 방에서 뺐어요 · 언제든 다시 부를 수 있어요');
+    }
+  }
+
+  function setAllOut(out) {
+    var i;
+    for (i = 0; i < RS.pets.length; i++) {
+      if (out) RS.out[RS.pets[i].id] = 1;
+      else delete RS.out[RS.pets[i].id];
+    }
+    if (RS.pets.length && roomLead() < 0) RS.lead = leadIndex();
+    save();
+    renderAll();
+    Sound.done();
+    toast(out ? '친구를 모두 방에서 뺐어요 · 빈 방이에요' : '친구를 모두 다시 불렀어요');
   }
 
   function boxTop() { var b = el('roomBody'); if (b) b.scrollTop = 0; }
@@ -5817,6 +6093,10 @@ var Room = (function () {
       if (it) { buyOrEquip(it.dataset.item); return; }
       var br = t.closest ? t.closest('[data-breed]') : null;
       if (br) { adopt(br.dataset.breed); return; }
+      var ob = t.closest ? t.closest('[data-out]') : null;
+      if (ob) { toggleOut(parseInt(ob.dataset.out, 10)); return; }
+      var all = t.closest ? t.closest('[data-allout]') : null;
+      if (all) { setAllOut(all.dataset.allout === 'out'); return; }
       var ld = t.closest ? t.closest('[data-lead]') : null;
       if (ld) { setLead(parseInt(ld.dataset.lead, 10)); return; }
       var gr = t.closest ? t.closest('[data-grade]') : null;
@@ -5846,15 +6126,19 @@ var Room = (function () {
       var t = ev.target;
       if (t && t.dataset && t.dataset.name !== undefined && ev.key === 'Enter') { ev.preventDefault(); t.blur(); }
     });
-    var tapPet = function (ev) {
-      var g = ev.target.closest ? ev.target.closest('.pet') : null;
+    var tapStage = function (ev) {
+      var t = ev.target;
+      /* 빈 방 안내 버튼 — 친구 다시 부르기 / 첫 친구 입양 */
+      if (t.closest && t.closest('#btnBringAll')) { setAllOut(false); return; }
+      if (t.closest && t.closest('#btnAdoptFirst')) { curTab = 'adopt'; renderTabs(); renderBody(); Sound.pick(); return; }
+      var g = t.closest ? t.closest('.pet') : null;
       if (!g) return;
       g.classList.remove('happy');
       void g.offsetWidth;
       g.classList.add('happy');
       Sound.pick();
     };
-    if (el('roomStage')) el('roomStage').addEventListener('click', tapPet);
+    if (el('roomStage')) el('roomStage').addEventListener('click', tapStage);
     /* 미리보기 잠금 배너 — 구매·닫기·바깥 탭 */
     if (el('stageLock')) el('stageLock').addEventListener('click', function () { clearPreview(); });
     if (el('lkBar')) el('lkBar').addEventListener('click', function (ev) {
@@ -5891,10 +6175,13 @@ var Room = (function () {
   }
 
   return { init: init, open: open, close: close, isOpen: isOpen, award: award, render: renderAll,
-           adopt: adopt, rename: renamePet, setLead: setLead,
+           adopt: adopt, rename: renamePet, setLead: setLead, toggleOut: toggleOut, setAllOut: setAllOut, roomPets: roomPets,
            state: function () {
+             var rp = roomPets(), ids = [], i;
+             for (i = 0; i < rp.length; i++) ids.push(rp[i].id);
              return { coins: RS.coins, grade: RS.grade, maxGrade: RS.maxGrade, gradeName: RG[RS.grade - 1].name,
                       cap: capacity(), level: playerLevel(), pets: RS.pets.slice(), lead: leadIndex(),
+                      placed: rp.length, placedIds: ids, out: outCount(), roomLead: roomLead(),
                       owned: RS.owned, equipped: RS.equipped, preview: pvSlots, previewSlots: pvSlots,
                       previewFocus: pvFocus, previewCount: pvCount(), gradePreview: gradePreview };
            },
@@ -5930,6 +6217,8 @@ if (window.__wsp) {
     adopt: function (id) { return Room.adopt(id); },
     rename: function (i, n) { Room.rename(i, n); return Room.state(); },
     lead: function (i) { Room.setLead(i); return Room.state(); },
+    out: function (i) { Room.toggleOut(i); return Room.state(); },
+    allOut: function (b) { Room.setAllOut(!!b); return Room.state(); },
     tab: function (id) {
       var btn = document.querySelector('#roomTabs [data-tab="' + id + '"]');
       if (btn) btn.click();
@@ -5946,6 +6235,8 @@ if (window.__wsp) {
         if (b) rs.pets.push({ id: i + 1, breed: b.id, name: (o.names && o.names[i]) || b.def });
       }
       rs.lead = o.lead || 0;
+      rs.out = {};
+      if (o.out) for (i = 0; i < o.out.length; i++) rs.out[o.out[i]] = 1;
       for (i = 0; i < Room._items.length; i++) rs.owned[Room._items[i].id] = 1;
       rs.grade = o.grade || 20;
       rs.maxGrade = o.maxGrade || Math.max(rs.grade, o.grade || 1);
@@ -5962,6 +6253,9 @@ if (window.__wsp) {
       if (o.coins != null) rs.coins = o.coins;
       store('wsp.room.pets', JSON.stringify(rs.pets));
       store('wsp.room.lead', String(rs.lead));
+      var _outs = [], _oi;
+      for (_oi = 0; _oi < rs.pets.length; _oi++) if (rs.out[rs.pets[_oi].id]) _outs.push(rs.pets[_oi].id);
+      store('wsp.room.out', JSON.stringify(_outs));
       store('wsp.room.owned', JSON.stringify(rs.owned));
       store('wsp.room.grade', String(rs.grade));
       store('wsp.room.mg', String(rs.maxGrade));
@@ -5977,7 +6271,7 @@ if (window.__wsp) {
     bonus: function (moves, par) { return Room._bonus(moves, par); },
     reset: function () {
       var keys = ['wsp.coins', 'wsp.room.grade', 'wsp.room.mg', 'wsp.room.rf_grade_back', 'wsp.room.char', 'wsp.room.owned', 'wsp.room.equipped',
-                  'wsp.room.welcome', 'wsp.room.pets', 'wsp.room.lead', 'wsp.room.rgv', 'wsp.room.rf1',
+                  'wsp.room.welcome', 'wsp.room.pets', 'wsp.room.lead', 'wsp.room.out', 'wsp.room.rgv', 'wsp.room.rf1',
                   'wsp.room.rf600'];
       keys.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
       location.reload();
