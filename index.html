@@ -1410,6 +1410,9 @@ var Sound = (function () {
   var sessionAt = 0;                          /* 마지막 오디오 세션 확인 시각 */
   var forceAt = 0;                            /* 마지막으로 세션을 'ambient 경유'로 재설정한 시각 */
   var lastSoundAt = 0;                        /* 마지막으로 소리를 낸 시각 — 조용했는지 판단 */
+  var returnPending = false;                  /* 화면에 돌아왔다 — 다음 터치에서 하드 복구(revive) */
+  var awayAt = 0;                             /* 화면을 떠난 시각 — '돌아왔다' 판단용 */
+  var returnForce = false;                    /* bfcache 복귀 — 컨텍스트가 반드시 죽었으므로 새로 만든다 */
 
   /* ==================================================================
      iOS 오디오 세션 — 소리가 '살아 있는데 안 들리는' 진짜 원인
@@ -1429,28 +1432,37 @@ var Sound = (function () {
      대응: '소리가 다시 나야 하는 순간'(컨텍스트 생성·음소거 해제·resume 성공·제스처)마다
      세션을 다시 밀어 넣는다. 이미 playback 이라 무시당할 수 있을 때는 ambient 를 한 번
      거쳐 SetCategory 가 두 번 통과하게 만든다(WebKit 이 제시한 우회법). */
-  function assertSession(force) {
+  function assertSession(force, hard) {
     var sess = null;
     try { sess = navigator.audioSession; } catch (e) { sess = null; }
     if (!sess) return false;                  /* iOS 17.4 미만·다른 브라우저: 할 수 있는 게 없다 */
     var now = Date.now();
-    /* ambient → playback 사이에는 아주 짧게 무음이 될 수 있으므로 남발하지 않는다 */
-    if (force && now - forceAt < 1500) force = false;
-    if (!force && now - sessionAt < 4000) return true;
+    /* hard = 백그라운드·앱 전환에서 돌아온 직후. 이때는 캐시가 '이미 playback' 으로 굳어
+       있어 간격 제한까지 겹치면 아무것도 못 한다 — 제한을 무시하고 반드시 통과시킨다. */
+    if (!hard) {
+      /* ambient → playback 사이에는 아주 짧게 무음이 될 수 있으므로 남발하지 않는다 */
+      if (force && now - forceAt < 1500) force = false;
+      if (!force && now - sessionAt < 4000) return true;
+    }
     sessionAt = now;
     try {
-      if (sess.type !== 'playback') { sess.type = 'playback'; return true; }
-      if (!force) return true;
+      if (!hard && sess.type !== 'playback') { sess.type = 'playback'; return true; }
+      if (!force && !hard) return true;
       forceAt = now;
       sess.type = 'ambient';                  /* 같은 값은 걸러진다 — 다른 값을 한 번 거친다 */
       sess.type = 'playback';
       /* 두 번째 쓰기가 어떤 이유로 무시되면 ambient(무음 스위치에 묶임)로 남는다.
          그때는 WebKit 캐시도 ambient 라 이번에는 한 번 더 써 주면 통과한다. */
-      setTimeout(function () {
-        try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {}
-      }, 60);
+      recheckSession(60);
+      if (hard) recheckSession(240);          /* 복귀 직후엔 조금 뒤에 한 번 더 확인한다 */
       return true;
     } catch (e) { return false; }
+  }
+
+  function recheckSession(ms) {
+    setTimeout(function () {
+      try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {}
+    }, ms);
   }
 
   function makeCtx() {
@@ -1465,8 +1477,16 @@ var Sound = (function () {
     try {
       c.onstatechange = function () {
         /* 백그라운드·화면 잠금·통화로 잠기면 다음 터치에서 다시 풀도록 표시만 한다 */
-        if (c.state === 'running') { onRunning(c); }
-        else if (!document.hidden) { kickAt = 0; }
+        var s = c.state;
+        if (s === 'running') {
+          /* 통화·시스템 중단(interrupted)에서 돌아오면 state 는 running 이 되지만 실제 출력은
+             끊긴 채일 수 있어, 다음 터치에서 하드 복구를 한 번 하도록 표시한다 */
+          if (c.wasInterrupted) { c.wasInterrupted = false; markReturn(); }
+          onRunning(c);
+        } else {
+          if (s === 'interrupted') c.wasInterrupted = true;
+          if (!document.hidden) { kickAt = 0; }
+        }
       };
     } catch (e) {}
     assertSession(true);                      /* 새 컨텍스트 = 세션을 다시 잡을 때 */
@@ -1481,7 +1501,7 @@ var Sound = (function () {
      전부 0 인 무음 데이터라 귀에 들리는 것은 없다. */
   var SILENT_WAV = 'data:audio/wav;base64,UklGRuwAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YcgAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
   var mediaEl = null;
-  function nudgeMedia() {
+  function nudgeMedia(hard) {
     try {
       if (!mediaEl) {
         mediaEl = document.createElement('audio');
@@ -1492,9 +1512,24 @@ var Sound = (function () {
         mediaEl.style.cssText = 'position:fixed;left:-2px;top:-2px;width:1px;height:1px;opacity:0;pointer-events:none';
         if (document.body) document.body.appendChild(mediaEl);
       }
-      if (!mediaEl.paused) return;
+      if (hard) {
+        /* 백그라운드에서 iOS 가 미디어 요소를 멈춰 두면 paused 여부와 상관없이 play() 가
+           무시되거나 25ms 짜리 무음이 이미 끝나 있는 경우가 있다 — 처음부터 다시 올린다. */
+        try { mediaEl.pause(); } catch (e) {}
+        try { mediaEl.currentTime = 0; } catch (e) {}
+        try { if (mediaEl.error || mediaEl.readyState === 0) mediaEl.load(); } catch (e) {}
+      } else if (!mediaEl.paused) return;
       var p = mediaEl.play();
       if (p && p.catch) p.catch(function () {});
+      if (hard) setTimeout(function () {
+        try {
+          if (mediaEl && mediaEl.paused) {
+            mediaEl.currentTime = 0;
+            var q = mediaEl.play();
+            if (q && q.catch) q.catch(function () {});
+          }
+        } catch (e) {}
+      }, 120);
     } catch (e) {}
   }
 
@@ -1596,11 +1631,54 @@ var Sound = (function () {
     if (c.state !== 'running') kick(c);
     return c;
   }
+  /* 화면에 돌아왔다는 신호만 세운다 — 제스처 밖이라 여기서 오디오를 억지로 건드리면
+     iOS 가 거부하고, 감시 타이머가 멀쩡한 컨텍스트를 '죽었다'고 오판하게 된다.
+     실제 복구는 복귀 뒤 첫 터치에서 revive() 가 한 번 한다. */
+  function markReturn(force) {
+    /* 화면을 떠난 적이 없으면(포커스만 돌아온 경우) 멀쩡한 컨텍스트를 갈아치우지 않는다.
+       force = bfcache 복귀(pageshow persisted) 처럼 '떠났다 돌아온 것이 분명한' 경우 */
+    if (!force && !awayAt && !document.hidden) { kickAt = 0; return; }
+    awayAt = 0;
+    returnPending = true;
+    returnForce = !!force;
+    kickAt = 0;
+  }
+
+  function markAway() { awayAt = Date.now(); }
+
+  /* 복귀 뒤 첫 제스처 — iOS 에서 '소리는 살아 있는데 안 들리는' 상태를 확실히 깨운다.
+     · 백그라운드에서 출력이 끊긴 컨텍스트는 state 가 running 이라고 말해도 소리가 안 난다.
+       resume 으로는 안 살아나므로 첫 실행과 같은 경로로 컨텍스트를 새로 만든다.
+     · 세션은 캐시(WebKit bug 323104) 때문에 '이미 playback' 이라 무시될 수 있어
+       간격 제한을 무시하고 ambient → playback 을 강제로 통과시킨다.
+     · 미디어 요소(무음 WAV)도 백그라운드에서 멈춰 있을 수 있어 처음부터 다시 재생한다. */
+  function revive() {
+    var hard = returnForce;
+    returnPending = false;
+    returnForce = false;
+    var c = ctx;
+    if (!c || c.state === 'closed') {
+      var c0 = makeCtx();
+      if (c0) kick(c0);
+    } else if (c.state !== 'running') {
+      kick(c);                                /* 잠긴 컨텍스트: 제스처 안에서 resume */
+    } else if (hard || Date.now() - rebuildAt > 1200) {
+      rebuild();                              /* running 이라 말하지만 조용한 컨텍스트 */
+    } else {
+      kick(c);                                /* 방금 새로 만든 컨텍스트 — 그대로 다시 푼다 */
+    }
+    assertSession(false, true);
+    nudgeMedia(true);                         /* 음소거 중에도 세션만 살려 둔다(소리는 없음) */
+    if (ctx && ctx.state !== 'running') watch(ctx);
+    return true;
+  }
+
   /* 첫 터치(어디를 눌러도)에서 오디오를 풀어 둔다 — 병을 누르기 전에 소리가 날 수 있게 */
   function arm() {
     if (armed) return;
     armed = true;
-    var fire = function () { ensure(false); };   /* 음소거 중에도 세션·컨텍스트는 계속 살려 둔다 */
+    /* 복귀 직후 첫 제스처만 하드 복구, 그 밖에는 값싼 경로 */
+    var fire = function () { if (returnPending) revive(); else ensure(false); };
     ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'keydown', 'click'].forEach(function (t) {
       document.addEventListener(t, fire, { passive: true, capture: true });
     });
@@ -1891,7 +1969,9 @@ var Sound = (function () {
        다음 터치가 반드시 한 번 더 풀도록 표시만 해 둔다.
        (여기서 감시 타이머를 걸면, 제스처가 아니라서 풀리지 않는 걸 '죽은 컨텍스트'로
         오판해 다음 터치마다 멀쩡한 컨텍스트를 갈아치우게 된다.) */
-    rearm: function () { arm(); kickAt = 0; },
+    rearm: function (force) { arm(); markReturn(force); },
+    /* 화면을 떠나는 순간(백그라운드·앱 전환) */
+    away: function () { markAway(); },
     isMuted: function () { return muted; },
     isRunning: function () { return !!ctx && ctx.state === 'running'; },
     /* 음소거 토글 — 켤 때가 이 게임에서 소리가 가장 잘 죽는 지점이다.
@@ -1901,8 +1981,8 @@ var Sound = (function () {
       muted = !muted;
       store('wsp.muted', muted ? '1' : '0');
       if (!muted) {
-        assertSession(true);
-        nudgeMedia();                              /* 제스처 안에서 반드시 불린다 */
+        assertSession(true, returnPending);        /* 복귀 직후엔 간격 제한을 넘어 강제 */
+        nudgeMedia(returnPending);                 /* 제스처 안에서 반드시 불린다 */
         if (stuck) rebuild(); else ensure(true);
         var c = ctx;
         if (c && c.state !== 'running') watch(c);   /* 안 풀리면 다음 터치에 새 컨텍스트 */
@@ -1928,7 +2008,7 @@ var Sound = (function () {
     loadPour: function () { return fetchPour(); },
     /* 검증용: 오디오 컨텍스트 상태(생성 횟수·잠김 여부) */
     state: function () {
-      return { has: !!ctx, state: ctx ? ctx.state : null, stuck: stuck,
+      return { has: !!ctx, state: ctx ? ctx.state : null, stuck: stuck, returned: returnPending,
                gen: ctxGen, sinceKick: kickAt ? Date.now() - kickAt : -1, pour: !!pourBuf };
     },
     /* 병이 다 차서 코르크 마개로 닫힐 때 — '톡/뽕' */
@@ -2817,11 +2897,14 @@ btnSound.addEventListener('click', function () {
 });
 
 document.addEventListener('visibilitychange', function () {
-  if (!document.hidden) { Sound.rearm(); btnSound.classList.toggle('muted', Sound.isMuted()); }
-});
-window.addEventListener('pageshow', function () {
+  if (document.hidden) { Sound.away(); return; }
   Sound.rearm(); btnSound.classList.toggle('muted', Sound.isMuted());
 });
+window.addEventListener('pageshow', function (ev) {
+  Sound.rearm(!!(ev && ev.persisted));      /* bfcache 복귀는 '떠났다 돌아온 것'이 분명하다 */
+  btnSound.classList.toggle('muted', Sound.isMuted());
+});
+window.addEventListener('pagehide', function () { Sound.away(); });
 window.addEventListener('focus', function () { Sound.rearm(); });
 
 var resizeTimer = 0, lastVW = 0, lastVH = 0;
