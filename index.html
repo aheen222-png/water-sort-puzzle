@@ -1587,18 +1587,26 @@ var Sound = (function () {
   }
 
   /* 죽은 컨텍스트는 버리고 새로 만든다 — iOS 에서 확실히 살아나는 방법.
-     잠긴 채로 조용한 것보다 낫다. 붓는 소리 녹음은 새 컨텍스트로 다시 디코딩한다. */
+     잠긴 채로 조용한 것보다 낫다. 붓는 소리 녹음은 새 컨텍스트로 다시 디코딩한다.
+     아이폰은 페이지당 살아 있는 컨텍스트 개수에 제한이 있어 생성이 실패할 수 있으므로,
+     새 것을 "먼저" 만들고 실패하면(제한) 옛 것을 닫은 뒤 한 번 더 시도한다. 그래도 안 되면
+     살아 있는 옛 컨텍스트로 돌아간다 — 새로 만들다 말고 아무것도 없는 것보다 낫다. */
   function rebuild() {
     var old = ctx;
-    ctx = null;
     if (wdTimer) { clearTimeout(wdTimer); wdTimer = 0; }   /* 옛 컨텍스트의 감시는 버린다 */
-    try { if (old && old.close) { var p = old.close(); if (p && p.catch) p.catch(function () {}); } } catch (e) {}
-    busNode = null; busCtx = null; silentBuf = null; silentCtx = null;
-    pourBuf = null; pourDecoding = false; pourDead = false; pourTries = 0;
     stuck = false; rebuildAt = Date.now();
     var c = makeCtx();
-    if (c && pourBytes) decodePour();
-    return c ? kick(c) : false;
+    if (!c && old) {                          /* 컨텍스트 개수 제한일 수 있다 — 자리를 비우고 재시도 */
+      try { if (old.close) { var q = old.close(); if (q && q.catch) q.catch(function () {}); } } catch (e) {}
+      old = null;
+      c = makeCtx();
+    }
+    if (!c) { return old ? kick(old) : false; }
+    try { if (old && old !== c && old.close) { var p = old.close(); if (p && p.catch) p.catch(function () {}); } } catch (e) {}
+    busNode = null; busCtx = null; silentBuf = null; silentCtx = null;
+    pourBuf = null; pourDecoding = false; pourDead = false; pourTries = 0;
+    if (pourBytes) decodePour();
+    return kick(c);
   }
 
   /* 모든 사용자 제스처에서 부른다 — 이미 열려 있으면 값싸게 지나간다(탭마다 버퍼를 만들지 않는다) */
