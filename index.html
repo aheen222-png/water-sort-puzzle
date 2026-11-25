@@ -2543,7 +2543,7 @@ window.I18N = {
       const dx = (x - h._x) / (82 * sc);
       const dy = (y - (h._y - 58 * sc)) / (86 * sc);
       const d = dx * dx + dy * dy;
-      if (d < 1.5 && d < bestD) { best = h; bestD = d; }
+      if (d < 2.2 && d < bestD) { best = h; bestD = d; }
     }
     if (best) {
       petHorse(best, x, y);
@@ -2556,10 +2556,10 @@ window.I18N = {
     const now = performance.now();
     if (!h._petAt || now - h._petAt > 700) {
       h._petAt = now;
-      h.affection = Math.min(20, (h.affection || 0) + 1);
+      h.affection = Math.min(8, (h.affection || 0) + 1);
       spawnHearts(x, y, 4, '#ff9ec4');
       let gained = false;
-      if (h.affection >= 20) {
+      if (h.affection >= 8) {
         h.affection = 0;
         state.hearts += 1; gained = true;
         updateCurrency();
@@ -2878,6 +2878,15 @@ window.I18N = {
       card.addEventListener('click', () => tapEgg(egg));
       grid.appendChild(card);
     }
+    const now0 = Date.now();
+    for (const egg of state.eggs) {
+      if (egg.last) {
+        const dtSec = Math.min(3600, (now0 - egg.last) / 1000) * 0.35;
+        egg.t += dtSec;
+        egg.progress = Math.min(1, (egg.progress || 0) + dtSec / egg.need * 0.55);
+      }
+      egg.last = now0;
+    }
     const paint = () => {
       for (const egg of state.eggs) {
         const cv = document.getElementById('egg-cv-' + egg.id);
@@ -2904,6 +2913,7 @@ window.I18N = {
       for (const egg of state.eggs) {
         egg.t += 0.5;
         egg.progress = Math.min(1, (egg.progress || 0) + 0.5 / egg.need * 0.55);
+        egg.last = Date.now();
         changed = true;
       }
       if (changed) paint();
@@ -3147,7 +3157,7 @@ window.I18N = {
       if (!counting) {
         for (const r of race.horses) {
           if (r.finished) continue;
-          const base = (7.4 + r.horse.stats.speed * 0.115) * r.pace;
+          const base = (9.2 + r.horse.stats.speed * 0.125) * r.pace;
           if (r.boostT > 0) { r.boostT -= dt; }
           const boost = r.isPlayer ? (r.boostT > 0 ? 5.2 : 0) : (Math.sin(race.t * 1.7 + r.lane) > 0.62 ? 1.5 : 0);
           const wobble = Math.sin(race.t * 2.1 + r.lane * 2) * 0.7;
