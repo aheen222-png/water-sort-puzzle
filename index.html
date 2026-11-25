@@ -83,6 +83,13 @@ img { -webkit-user-drag: none; user-select: none; }
   font-size: 11.5px; font-weight: 800; letter-spacing: 0;
 }
 .pill svg { width: 15px; height: 15px; display: block; }
+.pill .plus {
+  display: inline-grid; place-items: center; width: 13px; height: 13px; margin-left: 1px;
+  border-radius: 50%; font-size: 11px; font-weight: 900; line-height: 1;
+  color: #7a5320; background: linear-gradient(180deg, #fff2c8, #ffd97e);
+  border: 1px solid rgba(180, 130, 50, .45);
+}
+.pill.carrot .plus { color: #a04c10; background: linear-gradient(180deg, #ffe4c9, #ffcda2); border-color: rgba(200, 110, 40, .4); }
 .pill.gold { color: #a5720d; }
 .pill.carrot { color: #cc6520; }
 .pill.heart { color: #d64c7d; }
@@ -100,6 +107,46 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
 /* ---------- 목장 ---------- */
 #screen-ranch { overflow: hidden; }
 #ranch-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
+
+/* ---------- 목장 위 버튼: 상점 / 당근밭 ---------- */
+#shop-fab {
+  position: absolute; top: 8px; right: 9px; z-index: 5;
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 12px 7px 9px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 900; letter-spacing: -.01em; color: #6b4308;
+  background: linear-gradient(180deg, #ffe9ad, #f8c651 60%, #f0ae30);
+  border: 2px solid #dda42f;
+  box-shadow: 0 3px 0 #c9891f, 0 6px 16px rgba(180, 130, 30, .32);
+  animation: shopPulse 3.4s ease-in-out infinite;
+}
+#shop-fab .sf-ico { width: 16px; height: 16px; display: block; }
+#shop-fab:active { transform: translateY(2px); box-shadow: 0 1px 0 #c9891f, 0 3px 8px rgba(180, 130, 30, .3); }
+@keyframes shopPulse {
+  0%, 100% { box-shadow: 0 3px 0 #c9891f, 0 6px 16px rgba(180, 130, 30, .28); }
+  50% { box-shadow: 0 3px 0 #c9891f, 0 7px 22px rgba(230, 170, 40, .55); }
+}
+#farm-btn {
+  position: absolute; right: 9px; bottom: 148px; z-index: 4;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px 6px 7px; border-radius: 16px;
+  background: rgba(255, 253, 246, .95);
+  border: 2px solid rgba(190, 145, 95, .38);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  transition: opacity .18s;
+}
+#farm-btn .fb-ico { font-size: 15px; line-height: 1; filter: grayscale(.55); opacity: .75; }
+#farm-btn .fb-txt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
+#farm-btn .fb-txt b { font-size: 11px; font-weight: 900; color: #6b5335; }
+#farm-btn .fb-sub { font-size: 10px; font-weight: 800; font-style: normal; color: var(--dim); }
+#farm-btn.ready { border-color: rgba(226, 160, 60, .7); background: rgba(255, 250, 236, .98); }
+#farm-btn.ready .fb-ico { filter: none; opacity: 1; transform: scale(1.08); }
+#farm-btn.ready .fb-txt b { color: #b06a12; }
+#farm-btn.ready .fb-sub { color: #d08015; }
+#farm-btn.ready { animation: farmBob 1.8s ease-in-out infinite; }
+#farm-btn.chip-open { opacity: 0; pointer-events: none; }
+@keyframes farmBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+#farm-btn:active { transform: translateY(1px) scale(.97); }
 #ranch-hint {
   position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
   font-size: 11px; font-weight: 700; color: #6b5335; white-space: nowrap;
@@ -457,11 +504,11 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
     <div class="currencies">
       <button class="pill gold" id="pill-gold" aria-label="gold">
         <svg viewBox="0 0 24 24"><defs><radialGradient id="cg" cx="35%" cy="30%"><stop offset="0" stop-color="#fff4c8"/><stop offset=".55" stop-color="#f3cd7d"/><stop offset="1" stop-color="#c9922c"/></radialGradient></defs><circle cx="12" cy="12" r="8.4" fill="url(#cg)"/><circle cx="12" cy="12" r="8.4" fill="none" stroke="#ffeab5" stroke-width="1" opacity=".7"/><path d="M12 7.6l1.35 2.9 3.05.36-2.25 2.1.6 3.04L12 14.5l-2.75 1.5.6-3.04-2.25-2.1 3.05-.36z" fill="#8a5f16" opacity=".5"/></svg>
-        <span id="gold-val">0</span>
+        <span id="gold-val">0</span><span class="plus" aria-hidden="true">+</span>
       </button>
       <button class="pill carrot" id="pill-carrot" aria-label="carrots">
         <svg viewBox="0 0 24 24"><defs><linearGradient id="cr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffc08a"/><stop offset="1" stop-color="#e2652c"/></linearGradient></defs><path d="M9 8.5c3.2-1.4 6.4-.4 7.6 1.6 1.2 2-.2 4.6-3.4 6.4-2.6 1.5-5.5 2.3-6.6 1.6-1-.7-.4-3.3 1-5.9C8 10.7 8.4 9 9 8.5z" fill="url(#cr)"/><path d="M14.6 4.2c.5 1.3.4 2.4-.1 3.2M12.7 3.4c.2 1.4 0 2.6-.7 3.5M16.6 5.4c.4 1 .4 1.9 0 2.7" stroke="#8ed56b" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>
-        <span id="carrot-val">0</span>
+        <span id="carrot-val">0</span><span class="plus" aria-hidden="true">+</span>
       </button>
       <button class="pill heart" id="pill-heart" aria-label="hearts">
         <svg viewBox="0 0 24 24"><defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd0e2"/><stop offset="1" stop-color="#ff6fa5"/></linearGradient></defs><path d="M12 20s-7.5-4.6-7.5-9.4A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.5 3C19.5 15.4 12 20 12 20z" fill="url(#hg)"/></svg>
@@ -474,6 +521,14 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
   <main>
     <section class="screen active" id="screen-ranch">
       <canvas id="ranch-canvas"></canvas>
+      <button id="shop-fab" aria-label="shop">
+        <svg class="sf-ico" viewBox="0 0 24 24"><path d="M4.6 8.5h14.8l-1.25 9.7a2 2 0 0 1-2 1.75H7.85a2 2 0 0 1-2-1.75z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><path d="M8.8 8.5V6.7a3.2 3.2 0 0 1 6.4 0v1.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M10 12.4h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span id="shop-fab-label">상점</span>
+      </button>
+      <button id="farm-btn" aria-label="carrot patch">
+        <span class="fb-ico">🥕</span>
+        <span class="fb-txt"><b id="farm-btn-label">당근밭</b><i class="fb-sub">+2</i></span>
+      </button>
       <div id="ranch-hint"></div>
       <div id="horse-chip">
         <div class="hc-face"><img id="hc-face" alt=""></div>
@@ -721,6 +776,10 @@ window.I18N = {
     welcomeStart: '목장으로 들어가기',
 
     ranchHint: '말을 콕 눌러 쓰다듬어 보세요',
+    shopBtn: '상점',
+    farmName: '당근밭', farmGain: '+{n}개', farmWait: '{s}초',
+    farmCool: '당근이 자라는 중이에요 · {s}초', farmToast: '당근 +{n}개 수확!',
+    giftToast: '업데이트 선물 당근 +{n}개!',
     chipFeed: '당근', chipOpen: '정보',
     petGain: '+{h} 하트', petFull: '이 말과의 교감이 가득 찼어요',
     coinFind: '골드 +{g}',
@@ -782,6 +841,10 @@ window.I18N = {
     welcomeStart: 'Enter the ranch',
 
     ranchHint: 'Tap a horse to pet it',
+    shopBtn: 'Shop',
+    farmName: 'Carrot patch', farmGain: '+{n}', farmWait: '{s}s',
+    farmCool: 'Still growing · {s}s', farmToast: '+{n} carrots harvested!',
+    giftToast: 'Update gift: +{n} carrots!',
     chipFeed: 'Carrot', chipOpen: 'Card',
     petGain: '+{h} heart', petFull: 'This bond is already full',
     coinFind: 'Gold +{g}',
@@ -944,9 +1007,11 @@ window.I18N = {
     const W = H * (iw / ih);
     const ph = o.phase || 0;
     const walk = o.walk == null ? 1 : o.walk;
-    const bob = Math.sin(ph) * H * 0.022 * walk;
+    const breath = o.breath == null ? 0 : o.breath;
+    const jump = o.jump || 0;
+    const bob = Math.sin(ph) * H * 0.022 * walk - Math.sin(ph * 0.85) * H * 0.006 * breath;
     const lean = Math.sin(ph) * 0.035 * walk;
-    const sq = 1 + Math.sin(ph * 2) * 0.012 * walk;
+    const sq = 1 + Math.sin(ph * 2) * 0.012 * walk + Math.sin(ph * 0.85) * 0.013 * breath;
     const aura = (window.AURAS && window.AURAS[o.aura]) || window.AURAS.none;
     const an = (window.SPRITE_ANCHORS && window.SPRITE_ANCHORS[breed]) || [0.2, 0.1];
     const ax = an[0] * W - W / 2;
@@ -954,7 +1019,7 @@ window.I18N = {
 
     ctx.save();
     ctx.globalAlpha = o.alpha == null ? 1 : o.alpha;
-    ctx.translate(o.x, o.ground + bob);
+    ctx.translate(o.x, o.ground + bob - jump);
     if (o.facing === 1) ctx.scale(-1, 1);
     ctx.rotate(-lean * (o.facing === 1 ? -1 : 1));
 
@@ -1639,8 +1704,10 @@ window.I18N = {
     tab: 'ranch',
     sel: { a: null, b: null, race: null },
     seenWelcome: false,
-    stats: { born: 0, races: 0, wins: 0 }
+    stats: { born: 0, races: 0, wins: 0 },
+    carrotGiftV2: false
   };
+  let pendingGift = 0;
 
   function save() {
     try {
@@ -1648,7 +1715,8 @@ window.I18N = {
         v: 2, lang: state.lang, gold: state.gold, carrots: state.carrots, hearts: state.hearts,
         slots: state.slots, horses: state.horses, eggs: state.eggs, seen: state.seen,
         seenMorphs: state.seenMorphs, seenAuras: state.seenAuras, combos: state.combos, maxGen: state.maxGen,
-        records: state.records, npc: state.npc, seenWelcome: state.seenWelcome, stats: state.stats
+        records: state.records, npc: state.npc, seenWelcome: state.seenWelcome, stats: state.stats,
+        carrotGiftV2: !!state.carrotGiftV2
       }));
     } catch (e) { /* private mode */ }
   }
@@ -1731,6 +1799,14 @@ window.I18N = {
       state.npc = d.npc && B[d.npc.breed] ? d.npc : null;
       state.seenWelcome = !!d.seenWelcome;
       state.stats = d.stats || state.stats;
+      state.carrotGiftV2 = !!d.carrotGiftV2;
+      // v3 업데이트: 이미 플레이하던 사용자에게 당근 선물 1회 지급
+      if (!state.carrotGiftV2) {
+        state.carrots += 25;
+        state.carrotGiftV2 = true;
+        pendingGift = 25;
+        queueSave();
+      }
       return true;
     } catch (e) { return false; }
   }
@@ -1899,7 +1975,8 @@ window.I18N = {
   /* ---------------- 초기화 ---------------- */
   function initNew() {
     state.lang = (navigator.language || 'ko').toLowerCase().startsWith('ko') ? 'ko' : 'en';
-    state.gold = 320; state.carrots = 6; state.hearts = 0; state.slots = 3;
+    state.gold = 320; state.carrots = 30; state.hearts = 0; state.slots = 3;
+    state.carrotGiftV2 = true; // 신규는 선물 없이 30개로 시작
     const a = makeHorse('white', { name: { ko: '별빛', en: 'Starlight' }, stats: { speed: 30, grace: 33, charm: 32 }, px: 0.28, py: 0.68, gen: 1 });
     const b = makeHorse('rose_pony', { name: { ko: '솜사탕', en: 'Cotton' }, stats: { speed: 27, grace: 29, charm: 36 }, px: 0.68, py: 0.86, gen: 1 });
     state.horses = [a, b];
@@ -1927,7 +2004,7 @@ window.I18N = {
   /* ---------------- 목장 씬 ---------------- */
   const ranch = {
     cv: null, ctx: null, w: 0, h: 0, bg: null, clouds: [], hearts: [], sparks: [],
-    last: 0, time: 0, ready: false, chipId: null, flies: []
+    last: 0, time: 0, ready: false, chipId: null, flies: [], layoutN: 0
   };
 
   function buildScene() {
@@ -1954,10 +2031,41 @@ window.I18N = {
     RA.paintBackground(b, w, h);
     ranch.bg = off;
     ranch.ready = true;
+    // 당근밭 버튼을 밭 안쪽 상단에 붙인다
+    const fb = $('farm-btn');
+    if (fb) { fb.style.top = Math.round(h * 0.845) + 'px'; fb.style.bottom = 'auto'; }
   }
 
   const groundY = (py) => ranch.h * (0.55 + py * 0.34);
   const horseH = (py) => ranch.h * (0.085 + py * 0.075);
+
+  /* ---------- 목장 대형: 말들이 겹치지 않게 예쁜 자리에 고정 ---------- */
+  const HERD_LAYOUT = {
+    1: [[0.50, 0.84]],
+    2: [[0.29, 0.72], [0.56, 0.90]],
+    3: [[0.22, 0.68], [0.64, 0.72], [0.42, 0.92]],
+    4: [[0.20, 0.64], [0.55, 0.62], [0.30, 0.84], [0.58, 0.90]],
+    5: [[0.14, 0.62], [0.44, 0.60], [0.76, 0.64], [0.26, 0.84], [0.54, 0.92]],
+    6: [[0.13, 0.61], [0.41, 0.60], [0.70, 0.62], [0.21, 0.82], [0.48, 0.86], [0.38, 0.96]],
+    7: [[0.12, 0.61], [0.39, 0.60], [0.66, 0.61], [0.88, 0.66], [0.17, 0.82], [0.44, 0.86], [0.34, 0.96]],
+    8: [[0.11, 0.60], [0.37, 0.59], [0.63, 0.60], [0.86, 0.64], [0.15, 0.81], [0.42, 0.85], [0.32, 0.95], [0.52, 0.96]]
+  };
+
+  function applyHerdLayout(force) {
+    const n = clamp(state.horses.length, 1, 8);
+    if (!force && ranch.layoutN === n) return;
+    ranch.layoutN = n;
+    const preset = HERD_LAYOUT[n] || HERD_LAYOUT[8];
+    const order = state.horses.slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    order.forEach((h, i) => {
+      const pos = preset[Math.min(i, preset.length - 1)];
+      h.px = pos[0];
+      h.py = pos[1];
+      h.facing = pos[0] < 0.5 ? 1 : -1; // 안쪽(가운데)을 바라보게
+      if (h.phase == null) h.phase = rand(0, 6.28);
+      h._joyAt = 0;
+    });
+  }
 
   function ranchFrame(ts) {
     if (!ranch.ready) return;
@@ -1992,36 +2100,26 @@ window.I18N = {
       ctx.restore();
     }
 
-    // 말 이동
+    // 말은 제자리에서 차분하게 숨만 쉼 (이동 없음)
+    applyHerdLayout();
     for (const horse of state.horses) {
-      horse.phase = (horse.phase || 0) + dt * (1.35 + horse.pace * 1.1);
-      horse.px += horse.facing * horse.pace * dt * 0.028;
-      if (horse.px > 0.92) { horse.px = 0.92; horse.facing = -1; }
-      if (horse.px < 0.06) { horse.px = 0.06; horse.facing = 1; }
-    }
-    // 겹침 완화
-    for (let i = 0; i < state.horses.length; i++) {
-      for (let j = i + 1; j < state.horses.length; j++) {
-        const A = state.horses[i], C = state.horses[j];
-        const dx = C.px - A.px, dy = (C.py - A.py) * 1.6;
-        const d = Math.hypot(dx, dy);
-        if (d < 0.17 && d > 0.0001) {
-          const push = (0.17 - d) * 0.8;
-          const ux = dx / d, uy = dy / d;
-          A.px = clamp(A.px - ux * push, 0.06, 0.92);
-          C.px = clamp(C.px + ux * push, 0.06, 0.92);
-          A.py = clamp(A.py - uy * push, 0.58, 0.94);
-          C.py = clamp(C.py + uy * push, 0.58, 0.94);
-        }
-      }
+      horse.phase = (horse.phase || 0) + dt * (1.35 + (horse.pace || 1) * 0.45);
     }
 
     const list = state.horses.slice().sort((a, b) => a.py - b.py);
+    const nowMs = performance.now();
     for (const horse of list) {
       const gy = groundY(horse.py);
       const hh = horseH(horse.py);
       const hx = clamp(horse.px * w, hh * 0.62, w - hh * 0.58);
       horse._x = hx; horse._y = gy; horse._h = hh;
+      // 쓰다듬으면 살짝 폴짝
+      let jump = 0;
+      if (horse._joyAt) {
+        const jt = (nowMs - horse._joyAt) / 1000;
+        if (jt < 0.6) jump = Math.sin((jt / 0.6) * Math.PI) * hh * 0.13;
+        else horse._joyAt = 0;
+      }
       RA.shadow(ctx, hx, gy, hh * 1.05, 0.16);
       // 희귀 등급·오라 반짝임
       const order = T[B[horse.breed].tier].order;
@@ -2041,8 +2139,21 @@ window.I18N = {
       }
       RA.drawHorse(ctx, horse.breed, {
         x: hx, ground: gy, h: hh, facing: horse.facing,
-        phase: horse.phase, walk: 1, morph: horse.morph, aura: horse.aura
+        phase: horse.phase, walk: 0, breath: 1, jump,
+        morph: horse.morph, aura: horse.aura
       });
+    }
+
+    // 당근밭 수확 준비 반짝임
+    if (farmState().ready) {
+      for (let i = 0; i < 3; i++) {
+        const fx = w * (0.75 + i * 0.085), fy = h * (0.855 + (i % 2) * 0.045);
+        const tw = 0.5 + 0.5 * Math.sin(ranch.time * 2.3 + i * 1.9);
+        ctx.save();
+        ctx.globalAlpha = 0.3 + tw * 0.55;
+        RA.star(ctx, fx, fy, h * 0.007 * (0.8 + tw * 0.7), '#fff6cf', tw * 0.8);
+        ctx.restore();
+      }
     }
 
     // 선택 표시
@@ -2179,7 +2290,7 @@ window.I18N = {
     state.tab = id;
     document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + id));
     document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
-    if (id === 'ranch') { buildScene(); hideChip(); }
+    if (id === 'ranch') { buildScene(); hideChip(); flushGiftToast(); }
     if (id === 'breed') renderBreed();
     if (id === 'nest') renderNest();
     if (id === 'race') renderRace();
@@ -2189,10 +2300,42 @@ window.I18N = {
   }
 
   /* ---------------- 목장 상호작용 ---------------- */
+
+  /* 당근밭: 15초마다 +2 */
+  const FARM = { cd: 15000, gain: 2 };
+  let farmReadyAt = 0;
+  function farmState() {
+    const left = Math.max(0, farmReadyAt - Date.now());
+    return { left, ready: left <= 0 };
+  }
+  function inFarm(x, y) {
+    return x >= ranch.w * 0.63 && y >= ranch.h * 0.80;
+  }
+  function updateFarmBtn() {
+    const btn = $('farm-btn');
+    if (!btn) return;
+    const s = farmState();
+    btn.classList.toggle('ready', s.ready);
+    const sub = btn.querySelector('.fb-sub');
+    if (sub) sub.textContent = s.ready ? t('farmGain', { n: FARM.gain }) : t('farmWait', { s: Math.ceil(s.left / 1000) });
+  }
+  function harvestFarm(x, y) {
+    const s = farmState();
+    if (!s.ready) { toast(t('farmCool', { s: Math.ceil(s.left / 1000) })); return false; }
+    state.carrots += FARM.gain;
+    farmReadyAt = Date.now() + FARM.cd;
+    updateCurrency(); queueSave(); updateFarmBtn();
+    spawnSparks(x, y, 9, '#ffb066');
+    spawnHearts(x, y - 10, 2, '#ffd08a');
+    toast(t('farmToast', { n: FARM.gain }));
+    return true;
+  }
+
   function tapRanch(ev) {
     const cv = $('ranch-canvas');
     const box = cv.getBoundingClientRect();
     const x = ev.clientX - box.left, y = ev.clientY - box.top;
+    if (inFarm(x, y)) { hideChip(); harvestFarm(x, y); return; }
     let best = null, bestD = 1e9;
     for (const h of state.horses) {
       if (h._x == null) continue;
@@ -2209,6 +2352,7 @@ window.I18N = {
     const now = performance.now();
     if (!h._petAt || now - h._petAt > 650) {
       h._petAt = now;
+      h._joyAt = now;
       h.affection = Math.min(8, (h.affection || 0) + 1);
       spawnHearts(x, y, 4, '#f27f9e');
       if (h.affection >= 8) {
@@ -2230,6 +2374,7 @@ window.I18N = {
   function showChip(h) {
     ranch.chipId = h.id;
     $('horse-chip').classList.add('on');
+    const fb = $('farm-btn'); if (fb) fb.classList.add('chip-open');
     RA.setImg($('hc-face'), h.breed);
     $('hc-face').src = RA.thumbURL(h.breed, h.morph, 120);
     $('hc-name').textContent = horseLabel(h);
@@ -2244,6 +2389,14 @@ window.I18N = {
   function hideChip() {
     ranch.chipId = null;
     $('horse-chip').classList.remove('on');
+    const fb = $('farm-btn'); if (fb) fb.classList.remove('chip-open');
+  }
+
+  function flushGiftToast() {
+    if (!pendingGift) return;
+    const g = pendingGift;
+    pendingGift = 0;
+    setTimeout(() => toast(t('giftToast', { n: g })), 800);
   }
 
   /* ---------------- 말 상세 ---------------- */
@@ -2877,15 +3030,19 @@ window.I18N = {
             RA.star(ctx, x - hh * (0.4 + i * 0.18), laneY - hh * (0.3 + i * 0.12), hh * 0.05, 'rgba(255,247,200,.85)');
           }
         }
-        // 이름표
+        // 이름표(레인 왼쪽 고정)
         const label = (r.isPlayer ? '★ ' : '') + horseLabel(r.horse);
         ctx.font = '800 9px -apple-system, sans-serif';
-        const tw = ctx.measureText(label).width + 10;
-        const lx = clamp(x - tw / 2, 2, w - tw - 2);
-        ctx.fillStyle = r.isPlayer ? 'rgba(255,244,206,.95)' : 'rgba(255,255,255,.78)';
-        ctx.beginPath(); ctx.roundRect(lx, laneY - hh * 1.18, tw, 13, 6); ctx.fill();
+        const tw = Math.min(w * 0.34, ctx.measureText(label).width + 12);
+        const lx = 6;
+        const ly = laneY - hh * 0.92;
+        ctx.fillStyle = r.isPlayer ? 'rgba(255,244,206,.95)' : 'rgba(255,255,255,.72)';
+        ctx.beginPath(); ctx.roundRect(lx, ly, tw, 14, 7); ctx.fill();
+        ctx.save();
+        ctx.beginPath(); ctx.roundRect(lx, ly, tw, 14, 7); ctx.clip();
         ctx.fillStyle = r.isPlayer ? '#8a5a12' : '#6d5643';
-        ctx.fillText(label, lx + 5, laneY - hh * 1.18 + 9.4);
+        ctx.fillText(label, lx + 6, ly + 10);
+        ctx.restore();
       }
       if (counting) {
         const left = Math.max(0, 2.2 - race.t);
@@ -3131,6 +3288,9 @@ window.I18N = {
     $('welcome-start').textContent = t('welcomeStart');
     $('hc-feed').textContent = t('chipFeed');
     $('hc-open').textContent = t('chipOpen');
+    const sf = $('shop-fab-label'); if (sf) sf.textContent = t('shopBtn');
+    const fl = $('farm-btn-label'); if (fl) fl.textContent = t('farmName');
+    updateFarmBtn();
   }
 
   /* ---------------- 환영 ---------------- */
@@ -3142,7 +3302,7 @@ window.I18N = {
     $('welcome-start').onclick = () => {
       w.classList.add('off');
       state.seenWelcome = true; save();
-      setTimeout(() => { buildScene(); requestAnimationFrame(ranchFrame); }, 40);
+      setTimeout(() => { buildScene(); requestAnimationFrame(ranchFrame); flushGiftToast(); }, 40);
     };
   }
 
@@ -3161,11 +3321,18 @@ window.I18N = {
     $('pill-gold').onclick = openShop;
     $('pill-carrot').onclick = openShop;
     $('pill-heart').onclick = openShop;
+    $('shop-fab').onclick = openShop;
+    $('farm-btn').onclick = () => {
+      const w = ranch.w || 390, h = ranch.h || 600;
+      hideChip();
+      harvestFarm(w * 0.82, h * 0.86);
+    };
     $('sheet-close').onclick = closeSheet;
     $('sheet-backdrop').onclick = closeSheet;
 
     const cv = $('ranch-canvas');
     cv.addEventListener('pointerdown', tapRanch, { passive: true });
+    setInterval(() => { if (state.tab === 'ranch') updateFarmBtn(); }, 500);
 
     window.addEventListener('resize', () => {
       if (state.tab === 'ranch') buildScene();
@@ -3178,7 +3345,7 @@ window.I18N = {
     } else {
       $('welcome').classList.add('off');
       setTab('ranch');
-      requestAnimationFrame(() => { buildScene(); requestAnimationFrame(ranchFrame); });
+      requestAnimationFrame(() => { buildScene(); requestAnimationFrame(ranchFrame); flushGiftToast(); });
     }
 
     // 스프라이트가 늦게 로드되면 한 번 더 그린다
