@@ -2391,7 +2391,7 @@ window.I18N = {
     for (const horse of list) {
       const sc = horseScale(horse.py);
       const gy = groundY(horse.py);
-      const hx = horse.px * w;
+      const hx = clamp(horse.px * w, 96 * sc + 4, w - 80 * sc - 4);
       horse._x = hx; horse._y = gy; horse._sc = sc;
       // 발밑 빛
       ctx.save();
