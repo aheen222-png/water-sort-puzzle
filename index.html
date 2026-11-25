@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#0a0918">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23140f2e'/%3E%3Cpath d='M32 10l6 14 15 2-11 11 3 15-13-7-13 7 3-15-11-11 15-2z' fill='%23f3cd7d'/%3E%3C/svg%3E">
 <title>Skyhoof</title>
 <style>:root {
   --bg0: #0a0918;
@@ -164,7 +165,7 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
   color: #241729; background: linear-gradient(180deg, #ffe9ad, #f3cd7d 55%, #d8a94e);
   box-shadow: 0 6px 18px rgba(216, 169, 78, .3), inset 0 1px 0 rgba(255, 255, 255, .6);
 }
-.btn-main:disabled { opacity: .38; box-shadow: none; }
+.btn-main:disabled { background: rgba(255, 255, 255, .07); color: rgba(240, 232, 255, .35); box-shadow: none; border: 1px solid var(--line); }
 .btn-main.ghost {
   background: rgba(255, 255, 255, .06); color: var(--ink);
   border: 1px solid var(--line); box-shadow: none;
@@ -204,7 +205,7 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
 
 /* 레이스 */
 .race-stage { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); }
-#race-canvas { display: block; width: 100%; height: 260px; }
+#race-canvas { display: block; width: 100%; height: 340px; }
 .race-row { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 6px; }
 .race-pick {
   flex: 0 0 auto; width: 84px; border-radius: 14px; padding: 6px; text-align: center;
@@ -281,7 +282,7 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
   background: radial-gradient(100% 80% at 50% 10%, rgba(140, 110, 255, .26), rgba(12, 9, 28, .2) 70%);
   border: 1px solid var(--line);
 }
-.detail-hero canvas { width: 100%; height: 168px; display: block; }
+.detail-hero canvas { width: 100%; height: 180px; display: block; }
 .detail-name-row { display: flex; align-items: baseline; gap: 8px; justify-content: center; margin-top: -6px; }
 .detail-name { font-family: "Iowan Old Style", serif; font-size: 21px; letter-spacing: .02em; }
 .detail-traits { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; margin: 8px 0 10px; }
@@ -347,7 +348,7 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
 }
 .welcome-sub { font-size: 11px; letter-spacing: .32em; color: #bda9ef; margin-top: 4px; }
 #welcome-canvas { width: 100%; height: 240px; display: block; margin: 8px 0 4px; }
-.welcome-copy { font-size: 12px; color: #ded4ff; line-height: 1.6; margin-bottom: 16px; }
+.welcome-copy { font-size: 12px; color: #ded4ff; line-height: 1.6; margin-bottom: 16px; text-wrap: balance; padding: 0 6px; }
 .welcome-start { padding: 13px 32px; }
 
 .hidden { display: none !important; }
@@ -489,6 +490,7 @@ window.I18N = {
     vsLabel: 'VS',
     breedBtn: '교배하기', breedCost: '당근 {c}개',
     breedPredHint: '예상 조합 — 확률은 유전에 따라 달라져요',
+    mutation: '돌연변이',
     chance: '{p}%',
     visitorTitle: '찾아온 명마', visitorSub: '이 명마와 교배하면 새로운 피가 섞여요',
     visitorBtn: '이 명마와 교배', refreshBtn: '다른 명마 부르기', refreshCost: '골드 {g}',
@@ -572,6 +574,7 @@ window.I18N = {
     vsLabel: 'VS',
     breedBtn: 'Breed', breedCost: '{c} carrots',
     breedPredHint: 'Possible outcomes — odds shift with inheritance',
+    mutation: 'Mutation',
     chance: '{p}%',
     visitorTitle: 'Famed visitor', visitorSub: 'Breeding with this horse mixes in rare blood',
     visitorBtn: 'Breed with this horse', refreshBtn: 'Call another', refreshCost: '{g} gold',
@@ -727,27 +730,28 @@ window.I18N = {
     return p;
   }
 
-  /* ---------- 실루엣 ---------- */
-  // 몸통 + 목 + 머리 (한 실루엣)
+  /* ---------- 실루엣 (오른쪽을 바라보는 말: 머리·가슴이 오른쪽, 엉덩이·꼬리가 왼쪽) ---------- */
   const HORSE_PTS = [
-    [108, -158], [117, -156], [127, -147], [136, -134], [142, -124], [146, -119],
-    [143, -115], [136, -114], [126, -120], [116, -128], [108, -134],
-    [97, -130], [85, -119], [72, -108], [60, -98], [46, -89], [42, -78],
-    [48, -71], [62, -64], [86, -60], [112, -60], [132, -66], [146, -74],
-    [153, -86], [152, -99], [140, -110], [118, -106], [94, -102], [76, -108],
-    [67, -113], [71, -134], [84, -150], [97, -157]
+    [146, -160], [154, -157], [163, -147], [169, -136], [173, -128], [176, -123],
+    [173, -119], [166, -118], [156, -123], [147, -130], [140, -135],
+    [144, -123], [148, -109], [151, -97], [152, -88],
+    [158, -82], [161, -73], [156, -64],
+    [140, -58], [116, -57], [92, -58], [72, -62], [58, -68],
+    [50, -76], [46, -88], [48, -100], [56, -108],
+    [78, -104], [104, -102], [124, -106],
+    [130, -120], [136, -138], [143, -154]
   ];
   const HORSE = spline(HORSE_PTS, true);
 
-  const HEAD_CLIP = spline([[108, -158], [117, -156], [127, -147], [136, -134], [142, -124], [146, -119], [143, -115], [136, -114], [126, -120], [116, -128], [108, -134], [105, -145]], true);
-  const NECK_CLIP = spline([[67, -113], [71, -134], [84, -150], [97, -157], [108, -158], [108, -134], [97, -130], [85, -119], [72, -108]], true);
-  const BODY_CLIP = spline([[60, -98], [46, -89], [42, -78], [48, -71], [62, -64], [86, -60], [112, -60], [132, -66], [146, -74], [153, -86], [152, -99], [140, -110], [118, -106], [94, -102], [76, -108], [67, -113]], true);
+  const HEAD_CLIP = spline([[146, -160], [154, -157], [163, -147], [169, -136], [173, -128], [176, -123], [173, -119], [166, -118], [156, -123], [147, -130], [140, -135], [141, -148]], true);
+  const NECK_CLIP = spline([[124, -106], [130, -120], [136, -138], [143, -154], [146, -160], [140, -135], [144, -123], [148, -109], [151, -97], [152, -88], [140, -96]], true);
+  const BODY_CLIP = spline([[152, -88], [158, -82], [161, -73], [156, -64], [140, -58], [116, -57], [92, -58], [72, -62], [58, -68], [50, -76], [46, -88], [48, -100], [56, -108], [78, -104], [104, -102], [124, -106], [132, -100]], true);
 
-  const CREST_PTS = [[67, -113], [71, -134], [84, -150], [97, -157], [108, -158]];
-  const TOPLINE_PTS = [[67, -113], [76, -108], [94, -102], [118, -106], [140, -110], [152, -99]];
-  const FACE_PTS = [[117, -156], [127, -147], [136, -134], [142, -124]];
-  const THROAT_PTS = [[108, -134], [97, -130], [85, -119], [72, -108]];
-  const MANE_CLIP = spline([[56, -108], [66, -114], [71, -136], [84, -151], [98, -158], [111, -160], [118, -152], [120, -74], [46, -74]], true);
+  const CREST_PTS = [[124, -106], [130, -120], [136, -138], [143, -154], [146, -160]];
+  const TOPLINE_PTS = [[124, -106], [104, -102], [78, -104], [56, -108], [48, -100]];
+  const FACE_PTS = [[154, -157], [163, -147], [169, -136], [173, -128]];
+  const THROAT_PTS = [[140, -135], [144, -123], [148, -109], [152, -88]];
+  const MANE_CLIP = spline([[116, -104], [126, -112], [130, -120], [136, -138], [143, -154], [147, -162], [158, -158], [162, -94], [108, -94]], true);
 
   /* ---------- 그라디언트 ---------- */
   const gradCache = new Map();
@@ -755,12 +759,12 @@ window.I18N = {
     const key = 'b' + coat;
     if (gradCache.has(key)) return gradCache.get(key);
     const p = COATS[coat] || COATS.white;
-    const g = ctx.createLinearGradient(0, -170, 0, -56);
+    const g = ctx.createLinearGradient(0, -170, 0, -54);
     g.addColorStop(0, p.light);
-    g.addColorStop(0.16, p.light);
-    g.addColorStop(0.36, p.base);
-    g.addColorStop(0.72, p.base);
-    g.addColorStop(0.9, p.shade);
+    g.addColorStop(0.18, p.light);
+    g.addColorStop(0.38, p.base);
+    g.addColorStop(0.74, p.base);
+    g.addColorStop(0.92, p.shade);
     g.addColorStop(1, p.deep);
     gradCache.set(key, g);
     return g;
@@ -769,7 +773,7 @@ window.I18N = {
     const key = 'm' + coat;
     if (gradCache.has(key)) return gradCache.get(key);
     const p = COATS[coat] || COATS.white;
-    const g = ctx.createLinearGradient(96, -180, 0, -112);
+    const g = ctx.createLinearGradient(150, -180, 60, -112);
     g.addColorStop(0, p.maneLight);
     g.addColorStop(0.4, p.mane);
     g.addColorStop(1, p.shade);
@@ -788,127 +792,63 @@ window.I18N = {
     ctx.save(); ctx.clip(NECK_CLIP); shadeNeck(ctx, g, p, R, detail); ctx.restore();
     ctx.save(); ctx.clip(HEAD_CLIP); shadeHead(ctx, g, p, R, detail); ctx.restore();
 
-    // 외곽
-    ctx.strokeStyle = 'rgba(22,14,40,.30)';
+    ctx.strokeStyle = 'rgba(22,14,40,.3)';
     ctx.lineWidth = 1.4;
     ctx.stroke(HORSE);
 
-    // 상단 빛
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(255,255,255,.45)';
     ctx.lineWidth = 1.3;
     ctx.stroke(spline(TOPLINE_PTS, false));
-    ctx.strokeStyle = 'rgba(255,255,255,.38)';
+    ctx.strokeStyle = 'rgba(255,255,255,.4)';
     ctx.stroke(spline(CREST_PTS, false));
     ctx.strokeStyle = 'rgba(255,255,255,.14)';
     ctx.lineWidth = 1;
     ctx.stroke(spline(THROAT_PTS, false));
 
-    // 근육 결
     ctx.strokeStyle = 'rgba(0,0,0,.09)';
     ctx.lineWidth = 1.7;
-    ctx.beginPath(); ctx.moveTo(132, -60); ctx.quadraticCurveTo(146, -74, 140, -94); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(120, -57); ctx.quadraticCurveTo(132, -70, 127, -90); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(64, -86); ctx.quadraticCurveTo(72, -100, 84, -104); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(62, -60); ctx.quadraticCurveTo(48, -74, 56, -94); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(74, -57); ctx.quadraticCurveTo(62, -70, 68, -90); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(148, -88); ctx.quadraticCurveTo(140, -102, 128, -106); ctx.stroke();
     ctx.strokeStyle = 'rgba(0,0,0,.05)';
-    ctx.beginPath(); ctx.moveTo(78, -55); ctx.quadraticCurveTo(98, -50, 116, -55); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(84, -55); ctx.quadraticCurveTo(110, -51, 136, -56); ctx.stroke();
 
     drawArmor(ctx, g, t, detail);
     drawEye(ctx, g);
   }
 
-  function drawHead(ctx, g, t, detail) {
-    const p = COATS[g.coat] || COATS.white;
-    const R = rng((g.seed || 2) + 41);
-    ctx.save();
-    ctx.translate(HEAD_X, HEAD_Y);
-    ctx.rotate(HEAD_ROT);
-    ctx.scale(0.86, 0.86);
-    const hg2 = ctx.createLinearGradient(0, -6, 0, 34);
-    hg2.addColorStop(0, p.light);
-    hg2.addColorStop(0.55, p.base);
-    hg2.addColorStop(1, p.base);
-    ctx.fillStyle = hg2;
-    ctx.fill(HEAD);
-    ctx.save();
-    ctx.clip(HEAD);
-    // 이마 광
-    const fore = ctx.createLinearGradient(4, -2, 30, 18);
-    fore.addColorStop(0, 'rgba(255,255,255,.42)');
-    fore.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = fore;
-    ctx.fillRect(-6, -8, 46, 34);
-    // 뺨 광
-    const cheek = ctx.createRadialGradient(20, 12, 1, 20, 12, 13);
-    cheek.addColorStop(0, 'rgba(255,255,255,.45)');
-    cheek.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = cheek;
-    ctx.fillRect(6, -2, 30, 30);
-    // 턱 그늘
-    const jaw = ctx.createLinearGradient(0, 28, 0, 34);
-    jaw.addColorStop(0, 'rgba(0,0,0,0)');
-    jaw.addColorStop(1, 'rgba(0,0,0,.12)');
-    ctx.fillStyle = jaw;
-    ctx.fillRect(0, 27, 48, 10);
-    // 볼 근육
-    ctx.strokeStyle = 'rgba(0,0,0,.1)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(4, 14);
-    ctx.quadraticCurveTo(14, 22, 26, 26);
-    ctx.stroke();
-    // 이마 골
-    ctx.strokeStyle = 'rgba(0,0,0,.06)';
-    ctx.beginPath();
-    ctx.moveTo(14, 1);
-    ctx.quadraticCurveTo(26, 8, 36, 18);
-    ctx.stroke();
-    drawPattern(ctx, g, R, detail);
-    if (g.coat === 'galaxy') drawGalaxy(ctx, R, detail);
-    ctx.restore();
-
-    ctx.strokeStyle = 'rgba(22,14,40,.32)';
-    ctx.lineWidth = 1.3;
-    ctx.stroke(HEAD);
-    ctx.strokeStyle = 'rgba(255,255,255,.42)';
-    ctx.lineWidth = 1.1;
-    ctx.stroke(spline([[9, -2], [19, 3], [29, 11], [38, 19]], false));
-
-    drawEye(ctx, g);
-    ctx.restore();
-  }
-
   function shadeHead(ctx, g, p, R, detail) {
-    const fore = ctx.createLinearGradient(108, -160, 136, -124);
+    const fore = ctx.createLinearGradient(148, -162, 172, -126);
     fore.addColorStop(0, 'rgba(255,255,255,.42)');
     fore.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = fore;
-    ctx.fillRect(102, -164, 46, 50);
-    const cheek = ctx.createRadialGradient(120, -136, 1, 120, -136, 14);
+    ctx.fillRect(138, -166, 46, 50);
+    const cheek = ctx.createRadialGradient(156, -138, 1, 156, -138, 14);
     cheek.addColorStop(0, 'rgba(255,255,255,.45)');
     cheek.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = cheek;
-    ctx.fillRect(104, -152, 32, 32);
+    ctx.fillRect(142, -152, 32, 32);
     ctx.fillStyle = 'rgba(0,0,0,.14)';
     ctx.beginPath();
-    ctx.moveTo(118, -127);
-    ctx.quadraticCurveTo(128, -118, 140, -114);
-    ctx.quadraticCurveTo(130, -120, 119, -131);
+    ctx.moveTo(150, -128);
+    ctx.quadraticCurveTo(162, -118, 172, -117);
+    ctx.quadraticCurveTo(162, -122, 151, -132);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,.14)';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(123, -122);
-    ctx.quadraticCurveTo(132, -116, 142, -115);
+    ctx.moveTo(156, -124);
+    ctx.quadraticCurveTo(166, -119, 174, -119);
     ctx.stroke();
     drawPattern(ctx, g, R, detail);
     if (g.coat === 'galaxy') drawGalaxy(ctx, R, detail);
   }
 
   function shadeBody(ctx, g, p, R, detail) {
-    const hl = ctx.createLinearGradient(0, -118, 0, -78);
+    const hl = ctx.createLinearGradient(0, -112, 0, -72);
     hl.addColorStop(0, 'rgba(255,255,255,.38)');
     hl.addColorStop(0.5, 'rgba(255,255,255,.1)');
     hl.addColorStop(1, 'rgba(255,255,255,0)');
@@ -926,23 +866,23 @@ window.I18N = {
       ctx.beginPath(); ctx.arc(0, 0, 1, 0, 6.283); ctx.fill();
       ctx.restore();
     };
-    glow(68, -94, 32, 24, p.light, 0.5);
-    glow(138, -84, 32, 26, p.light, 0.4);
-    glow(104, -88, 36, 24, p.light, 0.14);
+    glow(148, -86, 30, 24, p.light, 0.5);
+    glow(66, -84, 32, 26, p.light, 0.42);
+    glow(104, -84, 36, 24, p.light, 0.14);
 
-    const belly = ctx.createLinearGradient(0, -78, 0, -58);
+    const belly = ctx.createLinearGradient(0, -74, 0, -56);
     belly.addColorStop(0, 'rgba(0,0,0,0)');
     belly.addColorStop(1, p.deep);
     ctx.globalAlpha = 0.4;
     ctx.fillStyle = belly;
-    ctx.fillRect(36, -82, 126, 30);
+    ctx.fillRect(40, -78, 126, 28);
     ctx.globalAlpha = 1;
 
     ctx.strokeStyle = 'rgba(0,0,0,.07)';
     ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.moveTo(70, -104);
-    ctx.quadraticCurveTo(58, -88, 62, -66);
+    ctx.moveTo(140, -104);
+    ctx.quadraticCurveTo(152, -88, 148, -66);
     ctx.stroke();
 
     drawPattern(ctx, g, R, detail);
@@ -950,7 +890,7 @@ window.I18N = {
   }
 
   function shadeNeck(ctx, g, p, R, detail) {
-    const sh = ctx.createLinearGradient(104, -134, 62, -100);
+    const sh = ctx.createLinearGradient(138, -132, 100, -100);
     sh.addColorStop(0, 'rgba(0,0,0,0)');
     sh.addColorStop(1, 'rgba(0,0,0,.28)');
     ctx.fillStyle = sh;
@@ -958,15 +898,15 @@ window.I18N = {
     ctx.strokeStyle = 'rgba(0,0,0,.08)';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(90, -146);
-    ctx.quadraticCurveTo(80, -128, 72, -108);
+    ctx.moveTo(132, -130);
+    ctx.quadraticCurveTo(142, -116, 150, -100);
     ctx.stroke();
     drawPattern(ctx, g, R, detail);
     if (g.coat === 'galaxy') drawGalaxy(ctx, R, detail);
   }
 
   function drawGalaxy(ctx, R, detail) {
-    const neb = [[84, -90, 34, 'rgba(120,80,235,.42)'], [124, -78, 30, 'rgba(70,140,240,.35)'], [108, -130, 20, 'rgba(200,110,255,.4)'], [140, -60, 22, 'rgba(255,110,200,.22)']];
+    const neb = [[78, -80, 34, 'rgba(120,80,235,.42)'], [130, -72, 30, 'rgba(70,140,240,.35)'], [120, -126, 20, 'rgba(200,110,255,.4)'], [148, -60, 22, 'rgba(255,110,200,.22)']];
     for (const [x, y, r, c] of neb) {
       const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
       rg.addColorStop(0, c);
@@ -977,7 +917,7 @@ window.I18N = {
     if (!detail) return;
     ctx.save();
     ctx.globalAlpha = 0.26;
-    ctx.translate(100, -86); ctx.rotate(-0.42);
+    ctx.translate(100, -82); ctx.rotate(0.42);
     const mg = ctx.createLinearGradient(-70, 0, 70, 0);
     mg.addColorStop(0, 'rgba(255,255,255,0)');
     mg.addColorStop(0.5, 'rgba(210,190,255,.9)');
@@ -988,12 +928,12 @@ window.I18N = {
     for (let i = 0; i < 60; i++) {
       ctx.globalAlpha = 0.3 + R() * 0.7;
       ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(42 + R() * 116, -160 + R() * 104, 0.35 + R() * 0.85, 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.arc(42 + R() * 122, -158 + R() * 100, 0.35 + R() * 0.85, 0, 6.283); ctx.fill();
     }
     for (let i = 0; i < 7; i++) {
       ctx.globalAlpha = 0.7 + R() * 0.3;
       ctx.fillStyle = '#fff';
-      star(ctx, 46 + R() * 100, -156 + R() * 94, 1 + R() * 1.4);
+      star(ctx, 46 + R() * 110, -154 + R() * 92, 1 + R() * 1.4);
     }
     ctx.globalAlpha = 1;
   }
@@ -1002,7 +942,7 @@ window.I18N = {
     if (!detail) return;
     if (g.pattern === 'dapple') {
       for (let i = 0; i < 16; i++) {
-        const x = 54 + R() * 96, y = -108 + R() * 44, r = 3.5 + R() * 6;
+        const x = 54 + R() * 100, y = -104 + R() * 44, r = 3.5 + R() * 6;
         const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
         rg.addColorStop(0, 'rgba(255,255,255,.4)');
         rg.addColorStop(0.55, 'rgba(255,255,255,.14)');
@@ -1012,7 +952,7 @@ window.I18N = {
       }
     } else if (g.pattern === 'starfall') {
       for (let i = 0; i < 28; i++) {
-        const x = 48 + R() * 106, y = -160 + R() * 104, s = 0.8 + R() * 2;
+        const x = 48 + R() * 112, y = -158 + R() * 100, s = 0.8 + R() * 2;
         const rg = ctx.createRadialGradient(x, y, 0, x, y, s * 3.8);
         rg.addColorStop(0, 'rgba(255,255,255,.95)');
         rg.addColorStop(0.3, 'rgba(255,246,200,.5)');
@@ -1023,7 +963,7 @@ window.I18N = {
         star(ctx, x, y, s);
       }
     } else if (g.pattern === 'lightning') {
-      const bolts = [[76, -108, 32], [112, -100, 28], [92, -70, 22]];
+      const bolts = [[78, -104, 32], [112, -96, 28], [92, -66, 22]];
       for (const [bx, by, len] of bolts) {
         ctx.strokeStyle = 'rgba(255,255,255,.75)';
         ctx.lineWidth = 2;
@@ -1040,12 +980,12 @@ window.I18N = {
         ctx.globalAlpha = 1;
       }
     } else if (g.pattern === 'gradient') {
-      const gr = ctx.createLinearGradient(40, -120, 160, -54);
+      const gr = ctx.createLinearGradient(40, -116, 164, -54);
       gr.addColorStop(0, 'rgba(255,255,255,.26)');
       gr.addColorStop(0.42, 'rgba(255,255,255,0)');
       gr.addColorStop(1, 'rgba(0,0,0,.14)');
       ctx.fillStyle = gr;
-      ctx.fillRect(38, -170, 124, 122);
+      ctx.fillRect(38, -168, 128, 120);
     }
   }
 
@@ -1065,36 +1005,36 @@ window.I18N = {
     const p = COATS[g.coat] || COATS.white;
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,.1)';
-    ctx.beginPath(); ctx.ellipse(124.5, -137, 5.6, 4.2, -0.45, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(160, -142, 5.6, 4.2, -0.35, 0, 6.283); ctx.fill();
     ctx.fillStyle = '#1d140e';
-    ctx.beginPath(); ctx.ellipse(124.8, -137.1, 3.5, 3.0, -0.45, 0, 6.283); ctx.fill();
-    const iris = ctx.createRadialGradient(125, -138, 0.4, 125, -137.4, 2.8);
+    ctx.beginPath(); ctx.ellipse(160.3, -142.1, 3.5, 3.0, -0.35, 0, 6.283); ctx.fill();
+    const iris = ctx.createRadialGradient(160.5, -143, 0.4, 160.5, -142.4, 2.8);
     iris.addColorStop(0, p.eye);
     iris.addColorStop(1, '#120c08');
     ctx.fillStyle = iris;
-    ctx.beginPath(); ctx.ellipse(124.9, -137.1, 2.6, 2.25, -0.45, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(160.4, -142.1, 2.6, 2.25, -0.35, 0, 6.283); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.95)';
-    ctx.beginPath(); ctx.arc(126.2, -138.6, 1, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(161.7, -143.6, 1, 0, 6.283); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.45)';
-    ctx.beginPath(); ctx.arc(123.7, -135.8, 0.55, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.arc(159.2, -140.8, 0.55, 0, 6.283); ctx.fill();
     ctx.strokeStyle = 'rgba(20,12,8,.6)';
     ctx.lineWidth = 1.05;
     ctx.beginPath();
-    ctx.moveTo(119.4, -139.4);
-    ctx.quadraticCurveTo(123.6, -141.6, 129, -138.6);
+    ctx.moveTo(155, -144.4);
+    ctx.quadraticCurveTo(159.2, -146.6, 164.6, -143.6);
     ctx.stroke();
-    const bl = ctx.createRadialGradient(121, -130, 0, 121, -130, 8);
+    const bl = ctx.createRadialGradient(157, -134, 0, 157, -134, 8);
     bl.addColorStop(0, 'rgba(255,255,255,.24)');
     bl.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = bl;
-    ctx.fillRect(113, -138, 16, 16);
+    ctx.fillRect(149, -142, 16, 16);
     ctx.fillStyle = 'rgba(35,20,15,.5)';
-    ctx.beginPath(); ctx.ellipse(141.6, -116.4, 1.9, 1.3, 0.5, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(171.6, -124.4, 1.9, 1.3, 0.5, 0, 6.283); ctx.fill();
     ctx.strokeStyle = 'rgba(60,35,25,.36)';
     ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.moveTo(143.4, -113.4);
-    ctx.quadraticCurveTo(138.8, -111.6, 135.6, -112.2);
+    ctx.moveTo(174.4, -120.4);
+    ctx.quadraticCurveTo(169.8, -118.6, 166.6, -119.2);
     ctx.stroke();
     ctx.restore();
   }
@@ -1121,82 +1061,8 @@ window.I18N = {
       ctx.fill();
       ctx.globalAlpha = 1;
     };
-    ear(102, -156, 95 + sway, -170, 4.0, p.shade, 0.95);
-    ear(108, -158, 104 + sway * 0.8, -172, 3.5, p.base, 1);
-  }
-
-  /* ---------- 흐르는 갈기/꼬리 잠금 ---------- */
-  function flowLock(ctx, p0, p1, p2, w0, w1, steps) {
-    const N = steps || 12;
-    const pts = [];
-    for (let i = 0; i <= N; i++) {
-      const t = i / N;
-      const mt = 1 - t;
-      const x = mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0];
-      const y = mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1];
-      pts.push([x, y]);
-    }
-    const left = [], right = [];
-    for (let i = 0; i <= N; i++) {
-      const t = i / N;
-      const prev = pts[Math.max(0, i - 1)], next = pts[Math.min(N, i + 1)];
-      let dx = next[0] - prev[0], dy = next[1] - prev[1];
-      const n = Math.hypot(dx, dy) || 1;
-      const nx = -dy / n, ny = dx / n;
-      const w = (w0 + (w1 - w0) * t) * Math.pow(1 - t * 0.92, 0.55);
-      left.push([pts[i][0] + nx * w, pts[i][1] + ny * w]);
-      right.push([pts[i][0] - nx * w, pts[i][1] - ny * w]);
-    }
-    const p = new Path2D();
-    p.moveTo(left[0][0], left[0][1]);
-    for (let i = 1; i <= N; i++) p.lineTo(left[i][0], left[i][1]);
-    p.lineTo(pts[N][0], pts[N][1]);
-    for (let i = N; i >= 0; i--) p.lineTo(right[i][0], right[i][1]);
-    p.closePath();
-    return p;
-  }
-
-  /* ---------- 크리스탈 장식 ---------- */
-  function drawArmor(ctx, g, t, detail) {
-    if (!detail) return;
-    const gem = g.horn === 'crystal' ? '#bff0ff' : g.horn === 'gold' ? '#ffe08a' : g.horn === 'ivory' ? '#fff6dd' : '#e6efff';
-    const metal = 'rgba(232,240,255,.85)';
-    // 가슴 장식
-    ctx.save();
-    ctx.translate(54, -82);
-    ctx.rotate(-0.22);
-    ctx.strokeStyle = metal;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(-6, -8);
-    ctx.quadraticCurveTo(0, -13, 6, -8);
-    ctx.quadraticCurveTo(0, 4, -6, -8);
-    ctx.stroke();
-    const gg = ctx.createLinearGradient(0, -8, 0, 4);
-    gg.addColorStop(0, '#ffffff');
-    gg.addColorStop(1, gem);
-    ctx.fillStyle = gg;
-    ctx.globalAlpha = 0.95;
-    ctx.beginPath();
-    ctx.moveTo(0, -10); ctx.lineTo(3.4, -3); ctx.lineTo(0, 3); ctx.lineTo(-3.4, -3); ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 0.5 + Math.sin(t * 2) * 0.2;
-    ctx.fillStyle = '#fff';
-    star(ctx, 0, -3, 1.8);
-    ctx.globalAlpha = 1;
-    ctx.restore();
-
-    // 엉덩이 별
-    ctx.save();
-    ctx.translate(138, -86);
-    ctx.fillStyle = gem;
-    ctx.globalAlpha = 0.85;
-    star(ctx, 0, 0, 3.4);
-    ctx.globalAlpha = 0.4;
-    ctx.fillStyle = '#fff';
-    star(ctx, 0, 0, 1.6);
-    ctx.globalAlpha = 1;
-    ctx.restore();
+    ear(143, -159, 136 + sway, -173, 4.0, p.shade, 0.95);
+    ear(149, -161, 145.5 + sway * 0.8, -175, 3.5, p.base, 1);
   }
 
   /* ---------- 갈기 ---------- */
@@ -1208,31 +1074,29 @@ window.I18N = {
 
     ctx.save();
     ctx.clip(MANE_CLIP);
-    // 목 위 볼륨
     ctx.fillStyle = p.mane;
     ctx.beginPath();
-    ctx.moveTo(67, -110);
-    ctx.quadraticCurveTo(70, -136, 88, -153);
-    ctx.quadraticCurveTo(99, -160, 110, -162);
-    ctx.quadraticCurveTo(98, -162, 84, -156);
-    ctx.quadraticCurveTo(67, -142, 60, -112);
+    ctx.moveTo(124, -105);
+    ctx.quadraticCurveTo(130, -132, 141, -154);
+    ctx.quadraticCurveTo(149, -165, 158, -166);
+    ctx.quadraticCurveTo(147, -165, 136, -155);
+    ctx.quadraticCurveTo(122, -136, 116, -108);
     ctx.closePath();
     ctx.fill();
 
-    // 큰 흐르는 갈래
     const locks = [
-      { root: [68, -114], c: [52, -120], tip: [44, -131], w: 8.5 },
-      { root: [72, -130], c: [56, -137], tip: [48, -149], w: 9 },
-      { root: [78, -144], c: [64, -152], tip: [58, -163], w: 8.5 },
-      { root: [87, -153], c: [76, -161], tip: [72, -172], w: 7.5 },
-      { root: [96, -158], c: [88, -166], tip: [86, -176], w: 6 },
-      { root: [104, -160], c: [98, -168], tip: [98, -178], w: 5 }
+      { root: [126, -112], c: [143, -118], tip: [151, -130], w: 8.5 },
+      { root: [130, -128], c: [146, -134], tip: [154, -147], w: 9 },
+      { root: [136, -143], c: [150, -151], tip: [156, -163], w: 8.5 },
+      { root: [144, -153], c: [155, -160], tip: [159, -171], w: 7.5 },
+      { root: [134, -136], c: [120, -146], tip: [114, -158], w: 7 },
+      { root: [128, -120], c: [112, -128], tip: [104, -139], w: 8 }
     ];
     for (let i = 0; i < locks.length; i++) {
       const L = locks[i];
       const sway = Math.sin(t * 1.6 + i * 0.7) * 2.2;
-      const c = [L.c[0] + sway * 0.4, L.c[1]];
-      const tip = [L.tip[0] + sway, L.tip[1]];
+      const c = [L.c[0] - sway * 0.4, L.c[1]];
+      const tip = [L.tip[0] - sway, L.tip[1]];
       ctx.fillStyle = grd;
       ctx.globalAlpha = 0.97;
       ctx.fill(flowLock(ctx, L.root, c, tip, L.w, L.w * 0.45, 14));
@@ -1240,37 +1104,35 @@ window.I18N = {
       ctx.globalAlpha = 0.32;
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(L.root[0] + 1, L.root[1]);
-      ctx.quadraticCurveTo(c[0] + 1, c[1] + 2, tip[0] + 1, tip[1] + 2);
+      ctx.moveTo(L.root[0] - 1, L.root[1]);
+      ctx.quadraticCurveTo(c[0] - 1, c[1] + 2, tip[0] - 1, tip[1] + 2);
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
-    // 두 번째 겹 (볼륨)
-    for (let i = 0; i < locks.length - 1; i++) {
+    for (let i = 0; i < locks.length; i++) {
       const L = locks[i];
       const sway = Math.sin(t * 1.9 + i) * 2;
       ctx.fillStyle = grd;
       ctx.globalAlpha = 0.9;
-      ctx.fill(flowLock(ctx, [L.root[0] + 2, L.root[1] + 3], [L.c[0] + 2, L.c[1] + 5], [L.tip[0] + 3 + sway, L.tip[1] + 6], L.w * 0.62, L.w * 0.3, 12));
+      ctx.fill(flowLock(ctx, [L.root[0] - 2, L.root[1] + 3], [L.c[0] - 2, L.c[1] + 5], [L.tip[0] - 3 - sway, L.tip[1] + 6], L.w * 0.62, L.w * 0.3, 12));
       ctx.globalAlpha = 1;
     }
 
-    // 앞머리
     const fs = Math.sin(t * 1.8) * 1.4;
     ctx.fillStyle = grd;
     ctx.beginPath();
-    ctx.moveTo(106, -158);
-    ctx.quadraticCurveTo(118, -152, 119 + fs, -140);
-    ctx.quadraticCurveTo(123, -147, 119, -155);
-    ctx.quadraticCurveTo(113, -161, 108, -162);
+    ctx.moveTo(147, -161);
+    ctx.quadraticCurveTo(156, -154, 157 + fs, -141);
+    ctx.quadraticCurveTo(161, -149, 158, -158);
+    ctx.quadraticCurveTo(153, -164, 149, -165);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = p.maneLight;
     ctx.globalAlpha = 0.4;
     ctx.lineWidth = 1.3;
     ctx.beginPath();
-    ctx.moveTo(107, -157);
-    ctx.quadraticCurveTo(116, -148, 118 + fs, -141);
+    ctx.moveTo(148, -160);
+    ctx.quadraticCurveTo(154, -150, 155 + fs, -142);
     ctx.stroke();
     ctx.globalAlpha = 1;
 
@@ -1278,7 +1140,7 @@ window.I18N = {
       for (let i = 0; i < 10; i++) {
         ctx.globalAlpha = 0.4 + R() * 0.5;
         ctx.fillStyle = '#fff';
-        star(ctx, 52 + R() * 54, -158 + R() * 46, 1 + R() * 1.5);
+        star(ctx, 104 + R() * 56, -172 + R() * 62, 1 + R() * 1.5);
       }
       ctx.globalAlpha = 1;
     }
@@ -1289,36 +1151,48 @@ window.I18N = {
   function drawTail(ctx, g, t, phase) {
     const p = COATS[g.coat] || COATS.white;
     const R = rng((g.seed || 5) + 991);
-    const bx = 152, by = -101;
+    const bx = 46, by = -102;
     const sway = Math.sin(t * 1.5 + (phase || 0) * 0.25) * 5;
-    const grd = ctx.createLinearGradient(bx, by, bx - 76, by + 54);
+    const grd = ctx.createLinearGradient(bx, by, bx + 30, by + 70);
     grd.addColorStop(0, p.mane);
     grd.addColorStop(0.5, p.mane);
     grd.addColorStop(1, p.maneLight);
 
     ctx.fillStyle = p.mane;
-    ctx.beginPath(); ctx.ellipse(bx - 3, by - 2, 10, 13, -0.35, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(bx + 3, by - 2, 10, 13, 0.35, 0, 6.283); ctx.fill();
+
+    // 꼬리 볼륨
+    ctx.fillStyle = grd;
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.moveTo(bx + 5, by - 8);
+    ctx.quadraticCurveTo(bx - 22, by + 8, bx - 28, by + 40);
+    ctx.quadraticCurveTo(bx - 30, by + 66, bx - 18, by + 88);
+    ctx.quadraticCurveTo(bx - 2, by + 70, bx + 6, by + 40);
+    ctx.quadraticCurveTo(bx + 12, by + 12, bx + 5, by - 8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
 
     const locks = [
-      { c: [bx - 30, by - 4], tip: [bx - 58, by + 10], w: 10 },
-      { c: [bx - 34, by + 12], tip: [bx - 66, by + 34], w: 12 },
-      { c: [bx - 32, by + 28], tip: [bx - 60, by + 58], w: 12 },
-      { c: [bx - 24, by + 40], tip: [bx - 44, by + 74], w: 11 },
-      { c: [bx - 10, by + 44], tip: [bx - 22, by + 80], w: 9 },
-      { c: [bx + 6, by + 40], tip: [bx + 2, by + 72], w: 7 }
+      { c: [bx - 16, by + 18], tip: [bx - 22, by + 44], w: 8 },
+      { c: [bx - 22, by + 34], tip: [bx - 28, by + 66], w: 9 },
+      { c: [bx - 20, by + 50], tip: [bx - 20, by + 84], w: 8.5 },
+      { c: [bx - 12, by + 60], tip: [bx - 6, by + 92], w: 7 },
+      { c: [bx - 2, by + 58], tip: [bx + 8, by + 86], w: 5.5 }
     ];
     for (let i = 0; i < locks.length; i++) {
       const L = locks[i];
       const sw = sway * (0.5 + i * 0.12);
       ctx.fillStyle = grd;
       ctx.globalAlpha = 0.96;
-      ctx.fill(flowLock(ctx, [bx, by + (i - 2.5) * 3], [L.c[0], L.c[1] + sw * 0.5], [L.tip[0], L.tip[1] + sw], L.w, L.w * 0.5, 14));
+      ctx.fill(flowLock(ctx, [bx - 2, by + (i - 2.5) * 3], [L.c[0] + sw * 0.4, L.c[1] + sw * 0.5], [L.tip[0] + sw, L.tip[1] + sw], L.w, L.w * 0.5, 14));
       ctx.strokeStyle = 'rgba(255,255,255,.3)';
       ctx.globalAlpha = 0.4;
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(bx - 2, by + (i - 2.5) * 3);
-      ctx.quadraticCurveTo(L.c[0] - 2, L.c[1] + sw * 0.5, L.tip[0] - 2, L.tip[1] + sw);
+      ctx.moveTo(bx, by + (i - 2.5) * 3);
+      ctx.quadraticCurveTo(L.c[0] + 2, L.c[1] + sw * 0.5, L.tip[0] + 2, L.tip[1] + sw);
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
@@ -1373,15 +1247,15 @@ window.I18N = {
 
     let top, mid, bot;
     if (raised) {
-      top = [62, -100]; mid = [80, -72]; bot = [68, -54];
+      top = [148, -94]; mid = [168, -68]; bot = [156, -50];
     } else if (hind) {
-      top = [far ? 146 : 137, -96];
-      mid = [far ? 158 : 148, -50];
-      bot = [far ? 150 : 140, -14];
+      top = [far ? 56 : 66, -94];
+      mid = [far ? 44 : 54, -48];
+      bot = [far ? 52 : 62, -14];
     } else {
-      top = [far ? 50 : 60, -98];
-      mid = [far ? 51 : 64, -48];
-      bot = [far ? 51 : 64, -14];
+      top = [far ? 140 : 150, -96];
+      mid = [far ? 141 : 152, -46];
+      bot = [far ? 141 : 152, -14];
     }
 
     const ph = phase + (far ? Math.PI : 0) + (hind ? 0.55 : 0);
@@ -1423,7 +1297,6 @@ window.I18N = {
       ctx.stroke();
     }
 
-    // 발굽 (bot 기준)
     const hx = bot[0], hy = bot[1];
     const hg = ctx.createLinearGradient(hx - 4, hy - 10, hx + 4, hy + 2);
     hg.addColorStop(0, p.hoof);
@@ -1479,8 +1352,7 @@ window.I18N = {
     return p;
   }
 
-  // 결정 날개 (오로라)
-  function crystalBlade(ctx, base, ang, len, w, grad, edge) {
+  function crystalBlade(ctx, base, ang, len, w) {
     const dx = Math.cos(ang), dy = -Math.sin(ang);
     const nx = -dy, ny = dx;
     const tip = [base[0] + dx * len, base[1] + dy * len];
@@ -1497,7 +1369,7 @@ window.I18N = {
 
   function drawCrystalWing(ctx, g, t, phase) {
     const flap = Math.sin(t * 1.6 + (phase || 0) * 0.3) * 0.03;
-    const A = [108, -100], B = [74, -130], C = [24, -146];
+    const A = [138, -98], B = [104, -132], C = [64, -152];
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const grad = ctx.createLinearGradient(A[0], A[1], C[0], C[1]);
@@ -1510,7 +1382,7 @@ window.I18N = {
       const u = i / (N - 1);
       const bx = quad(A[0], B[0], C[0], u);
       const by = quad(A[1], B[1], C[1], u);
-      const ang = ((206 - 34 * u)) * Math.PI / 180 + flap;
+      const ang = ((196 - 28 * u)) * Math.PI / 180 + flap;
       const len = 34 + 54 * Math.pow(u, 0.7);
       const w = 7.5 + u * 2.5;
       const pth = crystalBlade(ctx, [bx, by], ang, len, w);
@@ -1522,7 +1394,6 @@ window.I18N = {
       ctx.lineWidth = 1.1;
       ctx.stroke(pth);
     }
-    // 안쪽 짧은 결정
     for (let i = 0; i < 6; i++) {
       const u = i / 5;
       const bx = quad(A[0], B[0], C[0], u * 0.7);
@@ -1532,7 +1403,6 @@ window.I18N = {
       ctx.fillStyle = 'rgba(190,240,255,.55)';
       ctx.fill(pth);
     }
-    // 뿌리 광
     const rg = ctx.createRadialGradient(A[0], A[1], 2, A[0], A[1], 40);
     rg.addColorStop(0, 'rgba(200,240,255,.7)');
     rg.addColorStop(1, 'rgba(120,160,255,0)');
@@ -1542,10 +1412,10 @@ window.I18N = {
     ctx.restore();
   }
 
-  function drawWingFan(ctx, g, t, phase, opts) {
+  function drawWingFan(ctx, g, t, phase) {
     const c = wingColors(g);
     const flap = Math.sin(t * 1.9 + (phase || 0) * 0.3) * 0.03;
-    const A = [108, -100], B = [76, -128], C = [26, -144];
+    const A = [138, -98], B = [106, -134], C = [66, -154];
     const grad = ctx.createLinearGradient(A[0], A[1], C[0], C[1]);
     grad.addColorStop(0, c.c);
     grad.addColorStop(0.35, c.b);
@@ -1553,7 +1423,6 @@ window.I18N = {
     grad.addColorStop(1, c.a);
 
     ctx.save();
-    if (opts && opts.mirror) { ctx.translate(A[0], A[1]); ctx.scale(-1, 1); ctx.translate(-A[0], -A[1]); }
     for (let row = 0; row < 3; row++) {
       const count = row === 0 ? 10 : row === 1 ? 8 : 6;
       for (let i = 0; i < count; i++) {
@@ -1579,9 +1448,9 @@ window.I18N = {
     }
     ctx.fillStyle = c.c;
     ctx.beginPath();
-    ctx.moveTo(A[0] + 3, A[1] + 6);
-    ctx.quadraticCurveTo(A[0] - 8, A[1] - 16, B[0] + 2, B[1] - 2);
-    ctx.quadraticCurveTo(B[0] - 4, B[1] + 8, A[0] + 5, A[1] + 7);
+    ctx.moveTo(A[0] - 3, A[1] + 6);
+    ctx.quadraticCurveTo(A[0] + 8, A[1] - 16, B[0] - 2, B[1] - 2);
+    ctx.quadraticCurveTo(B[0] + 4, B[1] + 8, A[0] - 5, A[1] + 7);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = c.edge;
@@ -1589,9 +1458,9 @@ window.I18N = {
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(A[0] + 2, A[1] + 4);
-    ctx.quadraticCurveTo(A[0] - 4, A[1] - 22, B[0] + 1, B[1]);
-    ctx.quadraticCurveTo((B[0] + C[0]) / 2 + 1, (B[1] + C[1]) / 2 - 2, C[0], C[1]);
+    ctx.moveTo(A[0] - 2, A[1] + 4);
+    ctx.quadraticCurveTo(A[0] + 4, A[1] - 22, B[0] - 1, B[1]);
+    ctx.quadraticCurveTo((B[0] + C[0]) / 2 - 1, (B[1] + C[1]) / 2 - 2, C[0], C[1]);
     ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.restore();
@@ -1599,7 +1468,7 @@ window.I18N = {
 
   function drawDragonWing(ctx, g, t, phase) {
     const c = wingColors(g);
-    const base = [108, -98];
+    const base = [138, -96];
     const flap = Math.sin(t * 1.7 + (phase || 0) * 0.3) * 3;
     ctx.save();
     const grad = ctx.createLinearGradient(base[0], base[1], base[0] - 58, base[1] + 20);
@@ -1656,17 +1525,16 @@ window.I18N = {
     }
     if (g.wing === 'prism') {
       if (layer === 'back') {
-        ctx.save(); ctx.globalAlpha = 0.35; ctx.translate(9, 7); ctx.scale(0.9, 0.9);
+        ctx.save(); ctx.globalAlpha = 0.35; ctx.translate(-9, 7); ctx.scale(0.9, 0.9);
         drawCrystalWing(ctx, g, t, phase + 0.4); ctx.restore();
         return;
       }
       drawCrystalWing(ctx, g, t, phase);
-      // 반짝임
       const R = rng((g.seed || 4) + 5);
       for (let i = 0; i < 12; i++) {
         const a = t * 0.8 + i * 0.9;
-        const x = 40 + Math.cos(a) * (26 + R() * 26);
-        const y = -140 + Math.sin(a * 1.3) * (22 + R() * 18);
+        const x = 100 + Math.cos(a) * (30 + R() * 26);
+        const y = -134 + Math.sin(a * 1.3) * (22 + R() * 18);
         ctx.globalAlpha = 0.35 + Math.sin(t * 3 + i) * 0.35;
         ctx.fillStyle = '#fff';
         star(ctx, x, y, 1 + R() * 1.8);
@@ -1677,7 +1545,7 @@ window.I18N = {
     if (layer === 'back') {
       ctx.save();
       ctx.globalAlpha = 0.42;
-      ctx.translate(9, 7);
+      ctx.translate(-9, 7);
       ctx.scale(0.9, 0.9);
       drawWingFan(ctx, g, t * 0.95, phase + 0.5);
       ctx.restore();
@@ -1687,8 +1555,8 @@ window.I18N = {
     if (g.wing === 'twin') {
       ctx.save();
       ctx.globalAlpha = 0.92;
-      ctx.translate(3, 14);
-      ctx.rotate(0.22);
+      ctx.translate(-4, 14);
+      ctx.rotate(-0.22);
       ctx.scale(0.7, 0.7);
       drawWingFan(ctx, g, t * 1.1, phase + 1.2);
       ctx.restore();
@@ -1697,12 +1565,12 @@ window.I18N = {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = 0.18 + Math.sin(t * 3) * 0.05;
-      const pg = ctx.createLinearGradient(20, -170, 64, -90);
+      const pg = ctx.createLinearGradient(120, -160, 70, -90);
       pg.addColorStop(0, '#ffe6a4');
       pg.addColorStop(0.5, '#ff9a3c');
       pg.addColorStop(1, '#ff5a1e');
       ctx.fillStyle = pg;
-      ctx.beginPath(); ctx.ellipse(50, -132, 40, 36, -0.5, 0, 6.283); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(104, -126, 40, 36, 0.5, 0, 6.283); ctx.fill();
       ctx.restore();
     }
   }
@@ -1710,14 +1578,14 @@ window.I18N = {
   function drawWingGlow(ctx, g, t) {
     if (g.wing === 'none' || g.wing === 'swan' || g.wing === 'twin') return;
     const c = wingColors(g);
-    const rg = ctx.createRadialGradient(56, -136, 2, 56, -136, 58);
+    const rg = ctx.createRadialGradient(108, -126, 2, 108, -126, 58);
     rg.addColorStop(0, c.glow);
     rg.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = 0.3 + Math.sin(t * 2.4) * 0.07;
     ctx.fillStyle = rg;
-    ctx.fillRect(-6, -196, 126, 122);
+    ctx.fillRect(50, -186, 122, 122);
     ctx.restore();
   }
 
@@ -1730,8 +1598,8 @@ window.I18N = {
       gold: ['#fff6c0', '#f2c65f', '#a5741d'],
       crystal: ['#ffffff', '#c8f2ff', '#8f7cf0']
     }[kind];
-    const base = [118, -151];
-    const tip = kind === 'crystal' ? [132, -193] : [133, -189];
+    const base = [152, -156];
+    const tip = kind === 'crystal' ? [166, -198] : [167, -194];
     ctx.save();
     const rg = ctx.createRadialGradient(tip[0] - 4, tip[1] + 10, 1, tip[0] - 4, tip[1] + 10, 24);
     rg.addColorStop(0, kind === 'gold' ? 'rgba(255,225,140,.8)' : kind === 'crystal' ? 'rgba(200,245,255,.85)' : 'rgba(255,250,225,.55)');
@@ -1750,7 +1618,6 @@ window.I18N = {
     ctx.quadraticCurveTo(base[0] + 13, base[1] - 14, base[0] + 6, base[1] + 2);
     ctx.closePath();
     ctx.fill();
-    // 결정면
     ctx.strokeStyle = kind === 'crystal' ? 'rgba(150,190,255,.55)' : 'rgba(110,80,40,.3)';
     ctx.lineWidth = 0.9;
     for (let i = 1; i <= 6; i++) {
@@ -1779,26 +1646,98 @@ window.I18N = {
     ctx.restore();
   }
 
+  /* ---------- 흐르는 갈기/꼬리 잠금 ---------- */
+  function flowLock(ctx, p0, p1, p2, w0, w1, steps) {
+    const N = steps || 12;
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const mt = 1 - t;
+      const x = mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0];
+      const y = mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1];
+      pts.push([x, y]);
+    }
+    const left = [], right = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const prev = pts[Math.max(0, i - 1)], next = pts[Math.min(N, i + 1)];
+      let dx = next[0] - prev[0], dy = next[1] - prev[1];
+      const n = Math.hypot(dx, dy) || 1;
+      const nx = -dy / n, ny = dx / n;
+      const w = (w0 + (w1 - w0) * t) * Math.pow(1 - t * 0.92, 0.55);
+      left.push([pts[i][0] + nx * w, pts[i][1] + ny * w]);
+      right.push([pts[i][0] - nx * w, pts[i][1] - ny * w]);
+    }
+    const p = new Path2D();
+    p.moveTo(left[0][0], left[0][1]);
+    for (let i = 1; i <= N; i++) p.lineTo(left[i][0], left[i][1]);
+    p.lineTo(pts[N][0], pts[N][1]);
+    for (let i = N; i >= 0; i--) p.lineTo(right[i][0], right[i][1]);
+    p.closePath();
+    return p;
+  }
+
+  /* ---------- 크리스탈 장식 ---------- */
+  function drawArmor(ctx, g, t, detail) {
+    if (!detail) return;
+    const gem = g.horn === 'crystal' ? '#bff0ff' : g.horn === 'gold' ? '#ffe08a' : g.horn === 'ivory' ? '#fff6dd' : '#e6efff';
+    const metal = 'rgba(232,240,255,.85)';
+    ctx.save();
+    ctx.translate(150, -80);
+    ctx.rotate(0.22);
+    ctx.strokeStyle = metal;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-6, -8);
+    ctx.quadraticCurveTo(0, -13, 6, -8);
+    ctx.quadraticCurveTo(0, 4, -6, -8);
+    ctx.stroke();
+    const gg = ctx.createLinearGradient(0, -8, 0, 4);
+    gg.addColorStop(0, '#ffffff');
+    gg.addColorStop(1, gem);
+    ctx.fillStyle = gg;
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.moveTo(0, -10); ctx.lineTo(3.4, -3); ctx.lineTo(0, 3); ctx.lineTo(-3.4, -3); ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 0.5 + Math.sin(t * 2) * 0.2;
+    ctx.fillStyle = '#fff';
+    star(ctx, 0, -3, 1.8);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(62, -92);
+    ctx.fillStyle = gem;
+    ctx.globalAlpha = 0.85;
+    star(ctx, 0, 0, 3.4);
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#fff';
+    star(ctx, 0, 0, 1.6);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
   /* ---------- 오라 ---------- */
   function drawAura(ctx, g, t, detail) {
     const grade = gradeFromTraits(g);
     const gr = GRADES[grade];
     if (grade === 'normal' || grade === 'rare') return;
     const pulse = 0.6 + Math.sin(t * 1.5 + (g.seed || 0)) * 0.12;
-    const rg = ctx.createRadialGradient(104, -56, 4, 104, -56, 86);
+    const rg = ctx.createRadialGradient(100, -50, 4, 100, -50, 86);
     rg.addColorStop(0, gr.glow);
     rg.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.save();
     ctx.globalAlpha = pulse * 0.42;
     ctx.fillStyle = rg;
-    ctx.beginPath(); ctx.ellipse(104, -54, 80, 32, 0, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(100, -48, 80, 32, 0, 0, 6.283); ctx.fill();
     ctx.restore();
     if (!detail) return;
     const R = rng((g.seed || 9) + 31);
     for (let i = 0; i < (grade === 'myth' ? 8 : 5); i++) {
       const a = t * 0.55 + i * 1.7;
-      const x = 104 + Math.cos(a) * (50 + R() * 16);
-      const y = -72 + Math.sin(a * 1.3 + i) * 38;
+      const x = 100 + Math.cos(a) * (50 + R() * 16);
+      const y = -66 + Math.sin(a * 1.3 + i) * 38;
       ctx.globalAlpha = 0.4 + Math.sin(t * 2 + i) * 0.3;
       ctx.fillStyle = gr.color;
       star(ctx, x, y, 1.8 + (i % 2));
@@ -1824,7 +1763,7 @@ window.I18N = {
     ctx.save();
     ctx.globalAlpha = 0.18;
     ctx.fillStyle = '#101028';
-    ctx.beginPath(); ctx.ellipse(104, 1, 62, 8, 0, 0, 6.283); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(100, 1, 62, 8, 0, 0, 6.283); ctx.fill();
     ctx.restore();
 
     drawAura(ctx, g, t, detail);
@@ -1939,13 +1878,28 @@ window.I18N = {
     ctx.restore();
 
     if (g.wing !== 'none') {
+      // 날개 빛깔의 작은 깃 장식 (좌우)
       const wc = wingColors(g);
-      ctx.globalAlpha = 0.8;
-      ctx.fillStyle = wc.a;
-      ctx.beginPath(); ctx.ellipse(0, -42, 25, 9, 0, 0, 6.283); ctx.fill();
-      ctx.globalAlpha = 0.3;
-      ctx.fillStyle = wc.b;
-      ctx.beginPath(); ctx.ellipse(0, -42, 25, 9, 0, 0, 6.283); ctx.fill();
+      for (const side of [-1, 1]) {
+        ctx.save();
+        ctx.translate(side * 23, -40);
+        ctx.rotate(side * 0.5);
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = wc.a;
+        ctx.beginPath();
+        ctx.moveTo(0, 4);
+        ctx.quadraticCurveTo(side * 7, -2, side * 2, -13);
+        ctx.quadraticCurveTo(side * -1, -5, 0, 4);
+        ctx.fill();
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = wc.b;
+        ctx.beginPath();
+        ctx.moveTo(-1, 2);
+        ctx.quadraticCurveTo(side * 4, -3, side * 1, -10);
+        ctx.quadraticCurveTo(-2, -3, -1, 2);
+        ctx.fill();
+        ctx.restore();
+      }
       ctx.globalAlpha = 1;
     }
     if (g.horn !== 'none') {
@@ -2153,9 +2107,9 @@ window.I18N = {
     state.lang = (navigator.language || 'ko').toLowerCase().startsWith('ko') ? 'ko' : 'en';
     state.gold = 320; state.carrots = 6; state.hearts = 0; state.slots = 3;
     const a = makeHorse({ coat: 'white', pattern: 'starfall', horn: 'ivory', wing: 'swan', seed: 1207 },
-      { name: { ko: '별빛', en: 'Starlight' }, baseStats: { speed: 30, grace: 32, charm: 34 }, px: 0.22, py: 0.16 });
+      { name: { ko: '별빛', en: 'Starlight' }, baseStats: { speed: 30, grace: 32, charm: 34 }, px: 0.24, py: 0.2 });
     const b = makeHorse({ coat: 'chestnut', pattern: 'gradient', horn: 'none', wing: 'none', seed: 4471 },
-      { name: { ko: '노을', en: 'Dusk' }, baseStats: { speed: 34, grace: 24, charm: 26 }, px: 0.72, py: 0.74 });
+      { name: { ko: '노을', en: 'Dusk' }, baseStats: { speed: 34, grace: 24, charm: 26 }, px: 0.7, py: 0.8 });
     state.horses = [a, b];
     state.seen = { coat: [], pattern: [], horn: [], wing: [] };
     state.horses.forEach(markSeen);
@@ -2190,9 +2144,9 @@ window.I18N = {
     const hh = box.height || cv.clientHeight || 80;
     const { ctx } = fitCanvas(cv, w, hh);
     ctx.clearRect(0, 0, w, hh);
-    const scale = opts.scale || Math.min(hh / 218, w / 218) * (opts.zoom || 1.1);
-    const gx = w * 0.5, gy = hh * 0.95;
-    HA.drawHorse(ctx, h, { x: gx - 88 * scale, y: gy, scale, t: opts.t || 0, phase: h.phase || 0, facing: 1, pose: opts.pose || 'walk', detail: true });
+    const scale = opts.scale || Math.min(hh / 232, w / 232) * (opts.zoom || 1.05);
+    const gx = w * 0.5, gy = hh * 0.96;
+    HA.drawHorse(ctx, h, { x: gx - 96 * scale, y: gy, scale, t: opts.t || 0, phase: h.phase || 0, facing: 1, pose: opts.pose || 'walk', detail: true });
   }
 
   /* ---------------- 목장 씬 ---------------- */
@@ -2205,6 +2159,7 @@ window.I18N = {
     const { ctx, w, h } = fitCanvas(cv, box.width, box.height);
     ranch.cv = cv; ranch.ctx = ctx; ranch.w = w; ranch.h = h;
     ranch.stars = Array.from({ length: 80 }, () => ({ x: Math.random() * w, y: Math.random() * h * 0.55, r: Math.random() * 1.5 + 0.3, p: Math.random() * 6.28, s: rand(0.6, 2.2) }));
+    ranch.motes = Array.from({ length: 26 }, () => ({ x: Math.random() * w, y: h * 0.35 + Math.random() * h * 0.6, p: Math.random() * 6.28, s: rand(0.15, 0.5), r: rand(0.6, 1.8) }));
     ranch.flies = Array.from({ length: 14 }, () => ({ x: Math.random() * w, y: h * 0.55 + Math.random() * h * 0.4, p: Math.random() * 6.28, s: rand(0.3, 0.9), a: rand(0.3, 0.8) }));
     // 배경 캐시
     const off = document.createElement('canvas');
@@ -2343,8 +2298,8 @@ window.I18N = {
     b.fillStyle = glow; b.fillRect(0, 0, w, h);
   }
 
-  const groundY = (py) => ranch.h * (0.63 + py * 0.29);
-  const horseScale = (py) => 0.32 + py * 0.5;
+  const groundY = (py) => ranch.h * (0.6 + py * 0.33);
+  const horseScale = (py) => 0.36 + py * 0.54;
 
   function ranchFrame(ts) {
     if (!ranch.ready) return;
@@ -2398,14 +2353,40 @@ window.I18N = {
     }
     ctx.restore();
 
+    // 떠도는 티끌
+    ctx.save();
+    for (const m of ranch.motes) {
+      const x = m.x + Math.sin(ranch.time * m.s + m.p) * 22;
+      const y = m.y - (ranch.time * 5 * m.s) % 40;
+      ctx.globalAlpha = 0.12 + 0.25 * Math.abs(Math.sin(ranch.time * 0.7 + m.p));
+      ctx.fillStyle = '#dfe9ff';
+      ctx.beginPath(); ctx.arc(x, y, m.r, 0, 6.283); ctx.fill();
+    }
+    ctx.restore();
+
     // 말 업데이트
     const list = state.horses.slice().sort((a, b) => a.py - b.py);
     for (const horse of state.horses) {
       horse.px += (horse.facing * horse.pace * dt * 0.035);
       if (horse.px > 0.94) { horse.px = 0.94; horse.facing = -1; }
       if (horse.px < 0.04) { horse.px = 0.04; horse.facing = 1; }
-      const targetPy = horse.py;
       horse.drawPhase = (horse.drawPhase || 0) + dt * (1.6 + horse.pace);
+    }
+    // 겹침 완화
+    for (let i = 0; i < state.horses.length; i++) {
+      for (let j = i + 1; j < state.horses.length; j++) {
+        const A = state.horses[i], B = state.horses[j];
+        const dx = B.px - A.px, dy = (B.py - A.py) * 1.4;
+        const d = Math.hypot(dx, dy);
+        if (d < 0.16 && d > 0.0001) {
+          const push = (0.16 - d) * 0.9;
+          const ux = dx / d, uy = dy / d;
+          A.px = clamp(A.px - ux * push, 0.04, 0.94);
+          B.px = clamp(B.px + ux * push, 0.04, 0.94);
+          A.py = clamp(A.py - uy * push, 0.05, 0.95);
+          B.py = clamp(B.py + uy * push, 0.05, 0.95);
+        }
+      }
     }
     for (const horse of list) {
       const sc = horseScale(horse.py);
@@ -2715,7 +2696,7 @@ window.I18N = {
       html += gradeBadge(HA.gradeFromTraits(npc));
       html += '</div>';
       html += '<div style="display:flex;gap:10px;align-items:center">';
-      html += '<canvas id="npc-cv" style="width:108px;height:96px;flex:0 0 auto"></canvas>';
+      html += '<canvas id="npc-cv" style="width:124px;height:100px;flex:0 0 auto"></canvas>';
       html += '<div style="flex:1 1 auto;min-width:0"><div style="font-size:14px;font-weight:700">' + horseLabel(npc) + '</div>';
       html += '<div style="font-size:10px;color:var(--dim);margin-top:2px">Lv.' + npc.level + '</div>';
       html += '<div class="trait-hint" style="margin-top:6px">' + horseTraits(npc).map(x => '<span class="hint-chip">' + x + '</span>').join('') + '</div></div>';
@@ -2735,7 +2716,7 @@ window.I18N = {
       const c1 = body.querySelector('#slot-cv-A'), c2 = body.querySelector('#slot-cv-B'), cn = body.querySelector('#npc-cv');
       if (c1 && a) thumb(c1, a, { zoom: 1.15 });
       if (c2 && b) thumb(c2, b, { zoom: 1.15 });
-      if (cn && npc) thumb(cn, npc, { zoom: 1.2, pose: 'prance' });
+      if (cn && npc) thumb(cn, npc, { zoom: 1.0, pose: 'prance' });
       body.querySelectorAll('.horse-row').forEach(row => {
         const h = state.horses.find(x => x.id === row.dataset.id);
         const cv = row.querySelector('canvas');
@@ -2779,12 +2760,16 @@ window.I18N = {
 
   function predictChips(a, b) {
     const kinds = [['coat', 'traitCoat'], ['pattern', 'traitPattern'], ['horn', 'traitHorn'], ['wing', 'traitWing']];
+    const mut = 9;
     return kinds.map(([k, label]) => {
       const x = a[k], y = b[k];
-      const same = x === y;
-      let txt = traitName(k, x) + (same ? '' : ' · ' + traitName(k, y));
-      return '<span class="hint-chip"><b>' + t(label) + '</b> ' + txt + '</span>';
-    }).join('') + '<span class="hint-chip">' + t('hintAurora') + '</span>';
+      if (x === y) {
+        return '<span class="hint-chip"><b>' + t(label) + '</b> ' + traitName(k, x) + ' ' + (100 - mut) + '%</span>';
+      }
+      return '<span class="hint-chip"><b>' + t(label) + '</b> ' + traitName(k, x) + ' 45% · ' + traitName(k, y) + ' 45%</span>';
+    }).join('') +
+      '<span class="hint-chip">' + t('mutation') + ' ' + mut + '%</span>' +
+      '<span class="hint-chip">' + t('hintAurora') + '</span>';
   }
 
   function breedPair(a, b, cost, fromNPC) {
@@ -2886,6 +2871,7 @@ window.I18N = {
       card.dataset.id = egg.id;
       card.innerHTML = '<canvas id="egg-cv-' + egg.id + '"></canvas>' +
         '<div class="egg-name">' + t('eggMystery') + '</div>' +
+        '<div class="egg-time" style="color:var(--dim);margin-top:1px">' + t('eggOf', { a: egg.parents[0], b: egg.parents[1] }) + '</div>' +
         '<div class="egg-time" id="egg-t-' + egg.id + '"></div>' +
         '<div class="egg-bar"><i id="egg-b-' + egg.id + '" style="width:0%"></i></div>' +
         '<div class="hatch-later">' + t('tapHatch') + '</div>';
@@ -3057,7 +3043,7 @@ window.I18N = {
   function drawRaceIdle(sel) {
     const cv = $('race-canvas');
     if (!cv) return;
-    const { ctx, w, h } = fitCanvas(cv, cv.getBoundingClientRect().width, 260);
+    const { ctx, w, h } = fitCanvas(cv, cv.getBoundingClientRect().width, 340);
     drawRaceBg(ctx, w, h, 0);
     const sc = h / 400;
     HA.drawHorse(ctx, sel, { x: w * 0.5 - 92 * sc, y: h * 0.9, scale: sc, t: 1, phase: 0, pose: 'prance', detail: true });
@@ -3106,20 +3092,37 @@ window.I18N = {
     }
   }
 
+  function drawRaceCountdown(ctx, w, h) {
+    const left = Math.max(0, 2.2 - race.t);
+    const n = Math.ceil(left / 0.7);
+    ctx.fillStyle = 'rgba(8, 6, 20, .35)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.textAlign = 'center';
+    ctx.font = '800 54px "Iowan Old Style", Palatino, serif';
+    ctx.fillStyle = 'rgba(255, 231, 170, .95)';
+    const pulse = 1 + (1 - (left % 0.7) / 0.7) * 0.18;
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(pulse, pulse);
+    ctx.fillText(n > 0 ? String(n) : (state.lang === 'ko' ? '출발!' : 'GO!'), 0, 18);
+    ctx.restore();
+    ctx.textAlign = 'left';
+  }
+
   function startRace() {
     if (race.running) return;
     const me = state.horses.find(h => h.id === state.sel.race);
     if (!me) return;
-    const stage = state.horses.filter(h => h.id !== me.id).slice(0, 3);
+    const stage = state.horses.filter(h => h.id !== me.id).slice(0, 2);
     const rivals = [];
-    while (rivals.length + stage.length < 3) {
+    while (rivals.length + stage.length < 2) {
       rivals.push(makeHorse({
         coat: pick(COAT_KEYS), pattern: pick(PATTERN_KEYS), horn: pick(HORN_KEYS), wing: pick(WING_KEYS),
         seed: Math.floor(Math.random() * 1e9)
       }, { baseStats: { speed: me.stats.speed + Math.round(rand(-6, 6)), grace: 30, charm: 30 }, name: { ko: '초원마', en: 'Wildrunner' } }));
     }
-    const lineup = [me].concat(stage.slice(0, 3), rivals).slice(0, 4).map((h, i) => ({
-      horse: h, lane: i, pos: -i * 2.2, speed: 0, surge: 0, boostT: 0, finished: false, time: 0, isPlayer: h.id === me.id
+    const lineup = [me].concat(stage.slice(0, 2), rivals).slice(0, 3).map((h, i) => ({
+      horse: h, lane: i, pos: -(2 - i) * 6, speed: 0, surge: 0, boostT: 0, finished: false, time: 0, pace: 0.94 + Math.random() * 0.12, isPlayer: h.id === me.id
     }));
     race.horses = lineup;
     race.t = 0; race.done = false; race.finishOrder = []; race.running = true;
@@ -3140,46 +3143,53 @@ window.I18N = {
       const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
       if (!race.running) return;
       race.t += dt; acc += dt;
-      for (const r of race.horses) {
-        if (r.finished) continue;
-        const base = 7.4 + r.horse.stats.speed * 0.115;
-        if (r.boostT > 0) { r.boostT -= dt; }
-        const boost = r.isPlayer ? (r.boostT > 0 ? 5.2 : 0) : (Math.sin(race.t * 1.7 + r.lane) > 0.6 ? 1.6 : 0);
-        const wobble = Math.sin(race.t * 2.1 + r.lane * 2) * 0.7;
-        r.speed = base + boost + wobble;
-        r.pos += r.speed * dt;
-        if (r.pos >= race.dist) { r.finished = true; r.time = race.t; race.finishOrder.push(r); }
-      }
-      const lead = Math.max(...race.horses.map(r => r.pos));
-      const { ctx, w, h } = fitCanvas(cv, cv.getBoundingClientRect().width, 260);
-      drawRaceBg(ctx, w, h, lead * 5 + race.t * 20);
-      const scale = h / 380;
-      const sorted = race.horses.slice().sort((a, b) => b.pos - a.pos);
-      for (const r of sorted) {
-        const laneY = h * (0.74 + r.lane * 0.0) - r.lane * h * 0.085;
-        const x = w * 0.12 + (r.pos / race.dist) * (w * 0.78);
-        ctx.save();
-        if (r.isPlayer) {
-          const g = ctx.createRadialGradient(x, laneY - 20, 2, x, laneY - 20, 46);
-          g.addColorStop(0, 'rgba(255, 226, 160, .25)');
-          g.addColorStop(1, 'rgba(255, 226, 160, 0)');
-          ctx.fillStyle = g;
-          ctx.beginPath(); ctx.arc(x, laneY - 20, 46, 0, 6.283); ctx.fill();
+      const counting = race.t < 2.2;
+      if (!counting) {
+        for (const r of race.horses) {
+          if (r.finished) continue;
+          const base = (7.4 + r.horse.stats.speed * 0.115) * r.pace;
+          if (r.boostT > 0) { r.boostT -= dt; }
+          const boost = r.isPlayer ? (r.boostT > 0 ? 5.2 : 0) : (Math.sin(race.t * 1.7 + r.lane) > 0.62 ? 1.5 : 0);
+          const wobble = Math.sin(race.t * 2.1 + r.lane * 2) * 0.7;
+          r.speed = base + boost + wobble;
+          r.pos += r.speed * dt;
+          if (r.pos >= race.dist) { r.finished = true; r.time = race.t; race.finishOrder.push(r); }
         }
-        HA.drawHorse(ctx, r.horse, {
+      }
+      const stage = fitCanvas(cv, cv.getBoundingClientRect().width, 340);
+      const sctx = stage.ctx, sw = stage.w, sh = stage.h;
+      const lead = Math.max.apply(null, race.horses.map(r => r.pos));
+      drawRaceBg(sctx, sw, sh, lead * 5 + race.t * 20);
+      const sorted = race.horses.slice().sort((a, b) => b.lane - a.lane);
+      for (const r of sorted) {
+        const laneY = sh * (0.9 - r.lane * 0.235);
+        const scale = (sh / 1080) * (1 + r.lane * 0.04);
+        const x = Math.max(12, sw * 0.14 + (r.pos / race.dist) * (sw * 0.74) + (3 - r.lane) * 6);
+        sctx.save();
+        if (r.isPlayer) {
+          const g = sctx.createRadialGradient(x, laneY - 26, 2, x, laneY - 26, 52);
+          g.addColorStop(0, 'rgba(255, 226, 160, .22)');
+          g.addColorStop(1, 'rgba(255, 226, 160, 0)');
+          sctx.fillStyle = g;
+          sctx.beginPath(); sctx.arc(x, laneY - 26, 52, 0, 6.283); sctx.fill();
+        }
+        HA.drawHorse(sctx, r.horse, {
           x: x - 92 * scale, y: laneY, scale, t: race.t * 2 + r.lane,
           phase: race.t * (7 + r.speed * 0.35) + r.lane, facing: 1,
           pose: r.boostT > 0 ? 'prance' : 'walk', detail: true
         });
-        ctx.fillStyle = r.isPlayer ? 'rgba(255, 226, 160, .9)' : 'rgba(220, 214, 255, .55)';
-        ctx.font = '600 9px -apple-system, sans-serif';
-        ctx.fillText(horseLabel(r.horse).slice(0, 10), x - 22, laneY + 12);
-        ctx.restore();
+        sctx.fillStyle = r.isPlayer ? 'rgba(255, 226, 160, .95)' : 'rgba(220, 214, 255, .55)';
+        sctx.font = '600 9px -apple-system, sans-serif';
+        sctx.fillText((r.isPlayer ? '★ ' : '') + horseLabel(r.horse).slice(0, 9), 12, laneY - 62 * scale + 6);
+        sctx.restore();
       }
-      ctx.fillStyle = 'rgba(255,255,255,.6)';
-      ctx.font = '600 11px -apple-system, sans-serif';
-      ctx.fillText(t('tapToRun'), 12, 20);
-      if (race.finishOrder.length === race.horses.length || race.t > 16) {
+      if (!counting) {
+        sctx.fillStyle = 'rgba(255,255,255,.65)';
+        sctx.font = '600 11px -apple-system, sans-serif';
+        sctx.fillText(t('tapToRun'), 12, 20);
+      }
+      if (counting) drawRaceCountdown(sctx, sw, sh);
+      if (!counting && (race.finishOrder.length === race.horses.length || race.t > 16)) {
         finishRace();
         return;
       }
@@ -3441,6 +3451,7 @@ window.I18N = {
 
   function tapRaidRanch(ev) { tapRanch(ev); }
 
+  window.__SKY = { state: state, race: race, ranch: ranch };
   window.addEventListener('load', boot);
   if (document.readyState === 'complete') boot();
 })();
