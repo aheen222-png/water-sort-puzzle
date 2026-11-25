@@ -326,7 +326,7 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
 }
 #hatch-fx.on { display: grid; }
 #hatch-fx canvas { width: 100%; height: 100%; position: absolute; inset: 0; }
-.hatch-inner { position: relative; text-align: center; z-index: 2; }
+.hatch-inner { position: relative; text-align: center; z-index: 2; transform: translateY(-16vh); }
 .hatch-inner .hk { font-size: 11px; letter-spacing: .3em; color: #ffe0a8; }
 .hatch-inner .hn { font-family: "Iowan Old Style", serif; font-size: 26px; margin: 6px 0 2px; }
 .hatch-inner .hs { font-size: 11.5px; color: var(--dim); }
@@ -2992,8 +2992,14 @@ window.I18N = {
       }
       ctx.globalAlpha = 1;
       if (el2 > 0.25) {
-        const sc = Math.min(w, h) * 0.00105;
-        HA.drawHorse(ctx, horse, { x: w / 2 - 92 * sc, y: h * 0.68, scale: sc, t: el2, phase: el2 * 2, pose: 'prance', detail: true });
+        const sc = Math.min(w, h) * 0.00118;
+        const gy = h * 0.82;
+        const rg2 = ctx.createRadialGradient(w / 2, gy - 90 * sc, 4, w / 2, gy - 90 * sc, 210 * sc);
+        rg2.addColorStop(0, 'rgba(255, 236, 190, .28)');
+        rg2.addColorStop(1, 'rgba(255, 236, 190, 0)');
+        ctx.fillStyle = rg2;
+        ctx.beginPath(); ctx.arc(w / 2, gy - 90 * sc, 210 * sc, 0, 6.283); ctx.fill();
+        HA.drawHorse(ctx, horse, { x: w / 2 - 96 * sc, y: gy, scale: sc, t: el2, phase: el2 * 2, pose: 'prance', detail: true });
       }
       hatchRAF = requestAnimationFrame(frame);
     }
