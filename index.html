@@ -2691,13 +2691,20 @@ window.I18N = {
       // 3) 그래도 겹치면 같은 등급 분포 안에서 처음부터 다시 뽑는다
       if (i % 2 === 1) out = rollOutcome(a, b);
     }
-    // 4) 조합이 거의 다 찬 극단적 경우 — 이 품종에서 비어 있는 겉모습을 전수로 찾아 강제로 고른다
+    // 4) 조합이 거의 다 찬 극단적 경우 — 비어 있는 겉모습을 전수로 찾아 강제로 고른다
     if (taken[lookSig(out)]) {
-      const found = freeLook(out.breed, taken);
-      if (found) {
-        out.morph = found.morph; out.mane = found.mane; out.wing = found.wing; out.legs = found.legs;
-        out.morphKind = 'mutation';
-        out.rare = (M[out.morph].order >= 2) || (out.auraKind === 'mutation' && A[out.aura].order >= 2) || out.kind === 'up';
+      const tier = T[B[out.breed].tier].order;
+      const near = BREED_KEYS.filter(k => k !== out.breed && T[B[k].tier].order === tier);
+      const far = BREED_KEYS.filter(k => T[B[k].tier].order !== tier);
+      for (const br of [out.breed].concat(near, far)) {
+        const found = freeLook(br, taken);
+        if (found) {
+          out.breed = br;
+          out.morph = found.morph; out.mane = found.mane; out.wing = found.wing; out.legs = found.legs;
+          out.morphKind = 'mutation';
+          out.rare = (M[out.morph].order >= 2) || (out.auraKind === 'mutation' && A[out.aura].order >= 2) || out.kind === 'up';
+          break;
+        }
       }
     }
     return out;
