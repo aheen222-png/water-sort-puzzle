@@ -95,6 +95,7 @@ img { -webkit-user-drag: none; user-select: none; }
 .pill.heart { color: #d64c7d; }
 #lang-btn {
   padding: 5px 7px; border-radius: 9px; font-size: 10px; font-weight: 800; letter-spacing: .04em;
+  white-space: nowrap; flex: 0 0 auto;
   color: #7a5b3c; background: rgba(255, 253, 246, .94);
   border: 1.5px solid var(--line); box-shadow: 0 2px 0 rgba(160, 120, 70, .12);
 }
@@ -2789,7 +2790,7 @@ window.I18N = {
       { x: w * 0.3, y: h * 0.2, s: Math.max(8, h * 0.016), v: 6.4, a: 0.55 }
     ];
     ranch.flies = Array.from({ length: 4 }, (_, i) => ({
-      x: rand(0.15, 0.85), y: rand(0.6, 0.85), p: rand(0, 6.28), s: rand(0.7, 1.15),
+      x: rand(0.2, 0.8), y: rand(0.34, 0.70), p: rand(0, 6.28), s: rand(0.7, 1.15),
       c: ['#fff3b0', '#ffd0e0', '#dcecff', '#ffe0b0'][i % 4]
     }));
     const off = document.createElement('canvas');
@@ -2905,22 +2906,6 @@ window.I18N = {
     const { ctx, w, h } = ranch;
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(ranch.bg, 0, 0, w, h);
-
-    // 나비
-    for (const f of (ranch.flies || [])) {
-      const fx = w * f.x + Math.sin(ranch.time * 0.7 + f.p) * w * 0.13;
-      const fy = h * f.y + Math.cos(ranch.time * 0.9 + f.p) * h * 0.035;
-      const flap = Math.abs(Math.sin(ranch.time * 9 + f.p));
-      const s2 = h * 0.006 * f.s * (0.6 + flap * 0.6);
-      ctx.save();
-      ctx.translate(fx, fy);
-      ctx.fillStyle = f.c;
-      ctx.beginPath(); ctx.ellipse(-s2 * 0.9, 0, s2, s2 * 0.72, -0.5, 0, 6.283); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(s2 * 0.9, 0, s2, s2 * 0.72, 0.5, 0, 6.283); ctx.fill();
-      ctx.fillStyle = 'rgba(120,90,60,.5)';
-      ctx.fillRect(-s2 * 0.12, -s2 * 0.8, s2 * 0.24, s2 * 1.6);
-      ctx.restore();
-    }
 
     // 말은 제자리에서 차분하게 숨만 쉼 (이동 없음)
     syncScene();
