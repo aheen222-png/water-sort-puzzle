@@ -126,15 +126,63 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
   50% { box-shadow: 0 3px 0 #c9891f, 0 7px 22px rgba(230, 170, 40, .55); }
 }
 #farm-btn {
-  position: absolute; right: 9px; bottom: 148px; z-index: 4;
+  /* 캔버스 박스 기준 % 위치 — 화면 크기가 바뀌어도 당근밭 바로 위에 고정된다 */
+  position: absolute; right: 9px; top: 85.5%; bottom: auto; z-index: 4;
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 10px 6px 7px; border-radius: 16px;
+  padding: 6px 10px 9px 7px; border-radius: 16px;
   background: rgba(255, 253, 246, .95);
   border: 2px solid rgba(190, 145, 95, .38);
   box-shadow: var(--shadow);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   transition: opacity .18s;
 }
+#farm-btn .fb-bar {
+  position: absolute; left: 9px; right: 9px; bottom: 4px; height: 3px;
+  border-radius: 999px; background: rgba(190, 145, 95, .22); overflow: hidden;
+}
+#farm-btn .fb-bar i { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #f7c86a, #ef9a3c); }
+#farm-btn.ready .fb-bar i { background: linear-gradient(90deg, #ffd267, #f28a2c); }
+
+#place-fab {
+  position: absolute; top: 48px; right: 9px; z-index: 5;
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px 6px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 900; letter-spacing: -.01em; color: #6b5335;
+  background: rgba(255, 253, 246, .93);
+  border: 2px solid rgba(190, 145, 95, .42);
+  box-shadow: 0 3px 0 rgba(160, 120, 70, .22), var(--shadow-sm);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+#place-fab .sf-ico { width: 14px; height: 14px; display: block; }
+#place-fab:active { transform: translateY(1px); }
+#place-fab.on { color: #8a4f04; background: rgba(255, 242, 205, .98); border-color: rgba(226, 160, 60, .8); }
+
+#place-bar {
+  position: absolute; left: 9px; right: 9px; bottom: 9px; z-index: 6;
+  display: none; flex-direction: column; gap: 6px;
+  padding: 8px 10px; border-radius: 15px;
+  background: rgba(255, 252, 244, .96);
+  border: 2px solid rgba(226, 186, 120, .7);
+  box-shadow: 0 6px 18px rgba(120, 80, 40, .2);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+#place-bar.on { display: flex; }
+#place-bar .pb-hint { font-size: 10.5px; font-weight: 800; color: #6b5335; line-height: 1.35; text-align: center; }
+#place-bar .pb-actions { display: flex; gap: 6px; }
+#place-bar .pb-btn {
+  flex: 1 1 0; padding: 8px 6px; border-radius: 11px; font-size: 11.5px; font-weight: 900;
+  color: #6b5335; background: #fff8ea; border: 1.5px solid rgba(190, 145, 95, .45);
+  box-shadow: 0 2px 0 rgba(160, 120, 70, .2);
+}
+#place-bar .pb-btn.primary {
+  color: #6b4308; background: linear-gradient(180deg, #ffe9ad, #f8c651 60%, #f0ae30);
+  border-color: #dda42f; box-shadow: 0 2px 0 #c9891f;
+}
+#place-bar .pb-btn:active { transform: translateY(1px); }
+#screen-ranch.placing #ranch-hint { opacity: 0; }
+#screen-ranch.placing #farm-btn { opacity: .35; pointer-events: none; }
+#screen-ranch.placing #ranch-canvas { touch-action: none; cursor: grab; }
+
 #farm-btn .fb-ico { font-size: 15px; line-height: 1; filter: grayscale(.55); opacity: .75; }
 #farm-btn .fb-txt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.1; }
 #farm-btn .fb-txt b { font-size: 11px; font-weight: 900; color: #6b5335; }
@@ -449,6 +497,7 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
   background: rgba(255, 253, 246, .98); border: 2px solid rgba(220, 170, 90, .5);
   color: #7a5215; opacity: 0; pointer-events: none; transition: opacity .22s, transform .22s;
   box-shadow: var(--shadow-lg); max-width: 84%; text-align: center;
+  word-break: keep-all;
 }
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
 
@@ -528,7 +577,19 @@ main { position: relative; flex: 1 1 auto; min-height: 0; z-index: 2; }
       <button id="farm-btn" aria-label="carrot patch">
         <span class="fb-ico">🥕</span>
         <span class="fb-txt"><b id="farm-btn-label">당근밭</b><i class="fb-sub">+2</i></span>
+        <span class="fb-bar"><i></i></span>
       </button>
+      <button id="place-fab" aria-label="arrange horses">
+        <svg class="sf-ico" viewBox="0 0 24 24"><path d="M6 4v10M6 4l-2.4 2.6M6 4l2.4 2.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 20V10M18 20l-2.4-2.6M18 20l2.4-2.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.4 12h3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span id="place-fab-label">자리 배치</span>
+      </button>
+      <div id="place-bar">
+        <div class="pb-hint" id="place-bar-hint"></div>
+        <div class="pb-actions">
+          <button class="pb-btn" id="place-auto">자동 정렬</button>
+          <button class="pb-btn primary" id="place-done">완료</button>
+        </div>
+      </div>
       <div id="ranch-hint"></div>
       <div id="horse-chip">
         <div class="hc-face"><img id="hc-face" alt=""></div>
@@ -780,6 +841,10 @@ window.I18N = {
     farmName: '당근밭', farmGain: '+{n}개', farmWait: '{s}초',
     farmCool: '당근이 자라는 중이에요 · {s}초', farmToast: '당근 +{n}개 수확!',
     giftToast: '업데이트 선물 당근 +{n}개!',
+    giftV4Toast: '업데이트 선물! 골드 +{g} · 당근 +{n}개',
+    placeBtn: '자리 배치', placeHint: '말을 끌어 옮기거나, 두 마리를 차례로 눌러 자리를 바꿔 보세요',
+    placeAuto: '자동 정렬', placeDone: '완료', placedDone: '자리를 저장했어요',
+    placeSwapped: '두 말의 자리를 바꿨어요', placeAutoDone: '가지런히 정렬했어요',
     chipFeed: '당근', chipOpen: '정보',
     petGain: '+{h} 하트', petFull: '이 말과의 교감이 가득 찼어요',
     coinFind: '골드 +{g}',
@@ -845,6 +910,10 @@ window.I18N = {
     farmName: 'Carrot patch', farmGain: '+{n}', farmWait: '{s}s',
     farmCool: 'Still growing · {s}s', farmToast: '+{n} carrots harvested!',
     giftToast: 'Update gift: +{n} carrots!',
+    giftV4Toast: 'Update gift! +{g} gold · +{n} carrots',
+    placeBtn: 'Arrange', placeHint: 'Drag a horse, or tap two horses one after another to swap them',
+    placeAuto: 'Auto layout', placeDone: 'Done', placedDone: 'Spot saved',
+    placeSwapped: 'Swapped the two horses', placeAutoDone: 'Tidied into a grid',
     chipFeed: 'Carrot', chipOpen: 'Card',
     petGain: '+{h} heart', petFull: 'This bond is already full',
     coinFind: 'Gold +{g}',
@@ -1705,9 +1774,11 @@ window.I18N = {
     sel: { a: null, b: null, race: null },
     seenWelcome: false,
     stats: { born: 0, races: 0, wins: 0 },
-    carrotGiftV2: false
+    carrotGiftV2: false,
+    giftV4: false,
+    herdCustom: false
   };
-  let pendingGift = 0;
+  let pendingGift = null; // { gold, carrots }
 
   function save() {
     try {
@@ -1716,7 +1787,7 @@ window.I18N = {
         slots: state.slots, horses: state.horses, eggs: state.eggs, seen: state.seen,
         seenMorphs: state.seenMorphs, seenAuras: state.seenAuras, combos: state.combos, maxGen: state.maxGen,
         records: state.records, npc: state.npc, seenWelcome: state.seenWelcome, stats: state.stats,
-        carrotGiftV2: !!state.carrotGiftV2
+        carrotGiftV2: !!state.carrotGiftV2, giftV4: !!state.giftV4, herdCustom: !!state.herdCustom
       }));
     } catch (e) { /* private mode */ }
   }
@@ -1758,7 +1829,7 @@ window.I18N = {
     });
     return {
       v: 2, lang: d.lang === 'en' ? 'en' : 'ko',
-      gold: (d.gold | 0) || 300, carrots: (d.carrots | 0) || 5, hearts: (d.hearts | 0) || 0,
+      gold: (d.gold | 0) || 5000, carrots: (d.carrots | 0) || 120, hearts: (d.hearts | 0) || 0,
       slots: Math.max(3, d.slots | 0), horses, eggs: [], seen: [],
       records: [], npc: null, seenWelcome: !!d.seenWelcome,
       stats: { born: 0, races: 0, wins: 0 }
@@ -1789,6 +1860,11 @@ window.I18N = {
         if (!M[h.morph]) h.morph = 'normal';
         if (!A[h.aura]) h.aura = 'none';
         h.gen = h.gen || 1;
+        h._sc = (typeof h._sc === 'number' && h._sc > 0.3 && h._sc < 2) ? h._sc : 1;
+        h._custom = false;
+        delete h._x; delete h._y; delete h._h;
+        if (typeof h.px !== 'number' || h.px < 0 || h.px > 1) h.px = rand(0.15, 0.85);
+        if (typeof h.py !== 'number' || h.py < 0 || h.py > 1) h.py = rand(0.6, 0.86);
       });
       state.eggs.forEach(e => {
         if (!M[e.morph]) e.morph = 'normal';
@@ -1800,13 +1876,23 @@ window.I18N = {
       state.seenWelcome = !!d.seenWelcome;
       state.stats = d.stats || state.stats;
       state.carrotGiftV2 = !!d.carrotGiftV2;
+      state.giftV4 = !!d.giftV4;
+      state.herdCustom = !!d.herdCustom;
       // v3 업데이트: 이미 플레이하던 사용자에게 당근 선물 1회 지급
       if (!state.carrotGiftV2) {
         state.carrots += 25;
         state.carrotGiftV2 = true;
-        pendingGift = 25;
-        queueSave();
+        pendingGift = { gold: 0, carrots: 25 };
       }
+      // v4 업데이트: 기존 세이브에 골드 5,000 · 당근 100 1회 선물
+      if (!state.giftV4) {
+        state.gold += 5000;
+        state.carrots += 100;
+        state.giftV4 = true;
+        const prev = pendingGift || { gold: 0, carrots: 0 };
+        pendingGift = { gold: prev.gold + 5000, carrots: prev.carrots + 100 };
+      }
+      if (pendingGift) queueSave();
       return true;
     } catch (e) { return false; }
   }
@@ -1975,8 +2061,10 @@ window.I18N = {
   /* ---------------- 초기화 ---------------- */
   function initNew() {
     state.lang = (navigator.language || 'ko').toLowerCase().startsWith('ko') ? 'ko' : 'en';
-    state.gold = 320; state.carrots = 30; state.hearts = 0; state.slots = 3;
-    state.carrotGiftV2 = true; // 신규는 선물 없이 30개로 시작
+    state.gold = 5000; state.carrots = 120; state.hearts = 0; state.slots = 3;
+    state.carrotGiftV2 = true; // 신규는 선물 없이 넉넉한 골드·당근으로 시작
+    state.giftV4 = true;
+    state.herdCustom = false;
     const a = makeHorse('white', { name: { ko: '별빛', en: 'Starlight' }, stats: { speed: 30, grace: 33, charm: 32 }, px: 0.28, py: 0.68, gen: 1 });
     const b = makeHorse('rose_pony', { name: { ko: '솜사탕', en: 'Cotton' }, stats: { speed: 27, grace: 29, charm: 36 }, px: 0.68, py: 0.86, gen: 1 });
     state.horses = [a, b];
@@ -2004,14 +2092,17 @@ window.I18N = {
   /* ---------------- 목장 씬 ---------------- */
   const ranch = {
     cv: null, ctx: null, w: 0, h: 0, bg: null, clouds: [], hearts: [], sparks: [],
-    last: 0, time: 0, ready: false, chipId: null, flies: [], layoutN: 0
+    last: 0, time: 0, ready: false, chipId: null, flies: [], layoutN: 0, layoutW: 0,
+    placeSel: null, swapId: null, drag: null
   };
 
   function buildScene() {
     const cv = $('ranch-canvas');
     if (!cv) return;
     const box = cv.getBoundingClientRect();
-    const { ctx, w, h } = fitCanvas(cv, box.width, box.height);
+    const bw = box.width || cv.clientWidth, bh = box.height || cv.clientHeight;
+    if (!bw || !bh) return; // 화면이 숨겨진 상태에서는 측정하지 않는다
+    const { ctx, w, h } = fitCanvas(cv, bw, bh);
     ranch.cv = cv; ranch.ctx = ctx; ranch.w = w; ranch.h = h;
     ranch.clouds = [
       { x: w * 0.12, y: h * 0.075, s: Math.max(15, h * 0.032), v: 3.2, a: 0.95 },
@@ -2031,40 +2122,160 @@ window.I18N = {
     RA.paintBackground(b, w, h);
     ranch.bg = off;
     ranch.ready = true;
-    // 당근밭 버튼을 밭 안쪽 상단에 붙인다
-    const fb = $('farm-btn');
-    if (fb) { fb.style.top = Math.round(h * 0.845) + 'px'; fb.style.bottom = 'auto'; }
+    // 캔버스 크기가 바뀌면 말 배치도 다시 계산한다(사용자 배치는 유지)
+    layoutHerd(false);
+  }
+
+  // 캔버스 CSS 크기가 드로잉 크기와 어긋나면(아이폰 주소창·회전·앱 복귀) 다시 맞춘다.
+  // 이 동기화가 없으면 그림이 가로로 늘어나고, 픽셀 기준으로 놓인 버튼이 화면 밖으로 밀린다.
+  function syncScene() {
+    if (state.tab !== 'ranch') return;
+    const cv = ranch.cv || $('ranch-canvas');
+    if (!cv) return;
+    const cw = cv.clientWidth, ch = cv.clientHeight;
+    if (!cw || !ch) return;
+    if (Math.abs(cw - ranch.w) > 1 || Math.abs(ch - ranch.h) > 1) buildScene();
   }
 
   const groundY = (py) => ranch.h * (0.55 + py * 0.34);
-  const horseH = (py) => ranch.h * (0.085 + py * 0.075);
+  const horseH = (py) => ranch.h * (0.085 + py * 0.075) * HERD_SCALE;
 
-  /* ---------- 목장 대형: 말들이 겹치지 않게 예쁜 자리에 고정 ---------- */
-  const HERD_LAYOUT = {
-    1: [[0.50, 0.84]],
-    2: [[0.29, 0.72], [0.56, 0.90]],
-    3: [[0.22, 0.68], [0.64, 0.72], [0.42, 0.92]],
-    4: [[0.20, 0.64], [0.55, 0.62], [0.30, 0.84], [0.58, 0.90]],
-    5: [[0.14, 0.62], [0.44, 0.60], [0.76, 0.64], [0.26, 0.84], [0.54, 0.92]],
-    6: [[0.13, 0.61], [0.41, 0.60], [0.70, 0.62], [0.21, 0.82], [0.48, 0.86], [0.38, 0.96]],
-    7: [[0.12, 0.61], [0.39, 0.60], [0.66, 0.61], [0.88, 0.66], [0.17, 0.82], [0.44, 0.86], [0.34, 0.96]],
-    8: [[0.11, 0.60], [0.37, 0.59], [0.63, 0.60], [0.86, 0.64], [0.15, 0.81], [0.42, 0.85], [0.32, 0.95], [0.52, 0.96]]
+  /* ---------- 목장 대형: 격자로 가지런히, 절대 겹치지 않게 ---------- */
+  const HERD_SCALE = 0.8; // 말 전체 크기(이전 빌드 대비 80%)
+  // 행 구성: 마릿수별 행 나눔(뒤→앞)과 행 크기 비율. py는 아래에서 자동 계산한다.
+  const HERD_ROWS = {
+    1: [{ n: 1, sc: 1 }],
+    2: [{ n: 2, sc: 1 }],
+    3: [{ n: 3, sc: 1 }],
+    4: [{ n: 2, sc: 1 }, { n: 2, sc: 0.94 }],
+    5: [{ n: 3, sc: 1 }, { n: 2, sc: 0.94 }],
+    6: [{ n: 3, sc: 1 }, { n: 3, sc: 0.94 }],
+    7: [{ n: 3, sc: 0.88 }, { n: 2, sc: 0.88 }, { n: 2, sc: 0.88 }],
+    8: [{ n: 3, sc: 0.88 }, { n: 3, sc: 0.88 }, { n: 2, sc: 0.88 }]
   };
 
-  function applyHerdLayout(force) {
+  function herdAspect(breed) {
+    const im = RA.sprite(breed);
+    const iw = im && (im.naturalWidth || im.width);
+    const ih = im && (im.naturalHeight || im.height);
+    return iw && ih ? iw / ih : 1.05;
+  }
+
+  // 앞줄 발끝을 기준으로 위로 차곡차곡 쌓아 py를 정한다 (행 사이 간격 일정, 울타리 아래 유지)
+  function stackRows(spec) {
+    const R = spec.length;
+    const front = R === 1 ? 0.80 : (R === 2 ? 0.842 : 0.862);
+    const gapPx = ranch.h * 0.013;
+    let scMul = 1;
+    let out = [];
+    for (let iter = 0; iter < 8; iter++) {
+      let g = front * ranch.h;
+      out = new Array(R);
+      for (let i = R - 1; i >= 0; i--) {
+        const py = clamp((g / ranch.h - 0.55) / 0.34, 0, 1);
+        const hh = horseH(py) * spec[i].sc * scMul;
+        out[i] = { py, hh, n: spec[i].n, sc: spec[i].sc * scMul };
+        g -= hh + gapPx;
+      }
+      if (R === 1 || out[0].py >= 0.24) break; // 뒤 행 발이 울타리 아래 초원에 내려섬
+      scMul *= 0.95;
+    }
+    return out;
+  }
+
+  // 사용자 배치 상태에서 새 말이 겹치지 않을 빈 자리를 찾는다
+  function freeSpot(h) {
+    const cands = [[0.5, 0.70], [0.26, 0.70], [0.74, 0.70], [0.5, 0.82], [0.26, 0.82], [0.74, 0.82], [0.5, 0.58], [0.2, 0.6], [0.8, 0.6]];
+    const box = (x, py) => {
+      const hh = horseH(py) * (h._sc || 1), w = hh * herdAspect(h.breed);
+      return { l: x * ranch.w - w / 2, r: x * ranch.w + w / 2, t: groundY(py) - hh, b: groundY(py) };
+    };
+    const others = state.horses.filter(o => o !== h && o._x != null).map(o => ({
+      l: o._x - o._h * herdAspect(o.breed) / 2, r: o._x + o._h * herdAspect(o.breed) / 2, t: o._y - o._h, b: o._y
+    }));
+    for (const c of cands) {
+      const bb = box(c[0], c[1]);
+      if (!others.some(o => bb.r > o.l && bb.l < o.r && bb.b > o.t && bb.t < o.b)) return c;
+    }
+    return cands[0];
+  }
+
+  function layoutHerd(force) {
+    if (state.herdCustom && !force) return; // 사용자가 직접 놓은 자리는 건드리지 않는다
     const n = clamp(state.horses.length, 1, 8);
-    if (!force && ranch.layoutN === n) return;
+    if (!ranch.w || !ranch.h) return;
+    if (!force && ranch.layoutN === n && ranch.layoutW === Math.round(ranch.w) && ranch.layoutH === Math.round(ranch.h)) return;
     ranch.layoutN = n;
-    const preset = HERD_LAYOUT[n] || HERD_LAYOUT[8];
+    ranch.layoutW = Math.round(ranch.w);
+    ranch.layoutH = Math.round(ranch.h);
+    const rows = stackRows(HERD_ROWS[n] || HERD_ROWS[8]);
+    const K = rows.reduce((m, r) => Math.max(m, r.n), 0);
     const order = state.horses.slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    order.forEach((h, i) => {
-      const pos = preset[Math.min(i, preset.length - 1)];
-      h.px = pos[0];
-      h.py = pos[1];
-      h.facing = pos[0] < 0.5 ? 1 : -1; // 안쪽(가운데)을 바라보게
-      if (h.phase == null) h.phase = rand(0, 6.28);
-      h._joyAt = 0;
+    const gap = clamp(ranch.w * 0.022, 6, 14);
+    const margin = Math.max(8, ranch.w * 0.028);
+    // 오른쪽 아래 당근밭·버튼 자리는 비워 둔다
+    const rightEdge = ranch.w * 0.80;
+
+    // 행 → 말 배정
+    const groups = [];
+    let idx = 0;
+    for (const row of rows) {
+      const take = Math.min(row.n, order.length - idx);
+      groups.push({ py: row.py, sc: row.sc, hs: order.slice(idx, idx + take) });
+      idx += take;
+    }
+
+    // 공통 열 격자: 각 열의 가장 넓은 말 폭으로 열 폭을 정한다
+    const colW = new Array(K).fill(0);
+    groups.forEach((g) => {
+      const H = horseH(g.py) * g.sc;
+      const k = g.hs.length;
+      g.cols = g.hs.map((h, i) => (k === 1 ? -1 : Math.round(i * (K - 1) / (k - 1))));
+      g.cols.forEach((c, i) => {
+        if (c < 0) return;
+        colW[c] = Math.max(colW[c], H * herdAspect(g.hs[i].breed));
+      });
     });
+    for (let c = 0; c < K; c++) if (!colW[c]) colW[c] = ranch.w * 0.12;
+    const blockW = colW.reduce((a, b) => a + b, 0) + gap * (K - 1);
+    // 기본은 가운데 정렬, 오른쪽 버튼과 닿으면 그만큼 왼쪽으로 밀어 정렬
+    let avail = ranch.w - margin * 2;
+    let scale = blockW > avail ? avail / blockW : 1;
+    let x0 = (ranch.w - blockW * scale) / 2;
+    if (x0 + blockW * scale > rightEdge) {
+      avail = Math.max(ranch.w * 0.4, rightEdge - margin);
+      scale = blockW > avail ? avail / blockW : 1;
+      x0 = margin + (avail - blockW * scale) / 2;
+    }
+    const colX = [];
+    let acc = x0;
+    for (let c = 0; c < K; c++) {
+      colX[c] = acc + (colW[c] * scale) / 2;
+      acc += colW[c] * scale + gap * scale;
+    }
+
+    groups.forEach((g) => {
+      const k = g.hs.length;
+      g.hs.forEach((h, i) => {
+        const c = g.cols[i];
+        const px = k === 1 ? 0.5 : colX[c] / ranch.w;
+        h.px = px;
+        h.py = g.py;
+        h._sc = scale * g.sc;
+        h._custom = false;
+        h.facing = px < 0.5 ? 1 : -1; // 안쪽(가운데)을 바라보게
+        if (h.phase == null) h.phase = rand(0, 6.28);
+        h._joyAt = 0;
+      });
+    });
+  }
+
+  // 수동 배치 모드에서 말을 놓을 수 있는 범위
+  function placeClamp(h, px, py) {
+    const y = clamp(py, 0.02, 0.95);
+    const hw = (horseH(y) * (h._sc || 1) * herdAspect(h.breed)) / 2;
+    const lo = hw / ranch.w + 0.01, hi = 1 - hw / ranch.w - 0.01;
+    return { px: lo >= hi ? 0.5 : clamp(px, lo, hi), py: y };
   }
 
   function ranchFrame(ts) {
@@ -2101,7 +2312,8 @@ window.I18N = {
     }
 
     // 말은 제자리에서 차분하게 숨만 쉼 (이동 없음)
-    applyHerdLayout();
+    syncScene();
+    layoutHerd(false);
     for (const horse of state.horses) {
       horse.phase = (horse.phase || 0) + dt * (1.35 + (horse.pace || 1) * 0.45);
     }
@@ -2110,7 +2322,7 @@ window.I18N = {
     const nowMs = performance.now();
     for (const horse of list) {
       const gy = groundY(horse.py);
-      const hh = horseH(horse.py);
+      const hh = horseH(horse.py) * (horse._sc || 1);
       const hx = clamp(horse.px * w, hh * 0.62, w - hh * 0.58);
       horse._x = hx; horse._y = gy; horse._h = hh;
       // 쓰다듬으면 살짝 폴짝
@@ -2119,6 +2331,17 @@ window.I18N = {
         const jt = (nowMs - horse._joyAt) / 1000;
         if (jt < 0.6) jump = Math.sin((jt / 0.6) * Math.PI) * hh * 0.13;
         else horse._joyAt = 0;
+      }
+      // 배치 모드: 고른 말 표시
+      if (placeMode && ranch.placeSel === horse.id) {
+        ctx.save();
+        ctx.setLineDash([6, 5]);
+        ctx.strokeStyle = 'rgba(255,214,110,.95)';
+        ctx.lineWidth = 2.6;
+        ctx.beginPath();
+        ctx.ellipse(hx, gy, hh * 0.72, hh * 0.2, 0, 0, 6.283);
+        ctx.stroke();
+        ctx.restore();
       }
       RA.shadow(ctx, hx, gy, hh * 1.05, 0.16);
       // 희귀 등급·오라 반짝임
@@ -2291,6 +2514,7 @@ window.I18N = {
     document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 'screen-' + id));
     document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
     if (id === 'ranch') { buildScene(); hideChip(); flushGiftToast(); }
+    else if (placeMode) setPlaceMode(false);
     if (id === 'breed') renderBreed();
     if (id === 'nest') renderNest();
     if (id === 'race') renderRace();
@@ -2318,6 +2542,8 @@ window.I18N = {
     btn.classList.toggle('ready', s.ready);
     const sub = btn.querySelector('.fb-sub');
     if (sub) sub.textContent = s.ready ? t('farmGain', { n: FARM.gain }) : t('farmWait', { s: Math.ceil(s.left / 1000) });
+    const bar = btn.querySelector('.fb-bar i');
+    if (bar) bar.style.width = Math.round((s.ready ? 1 : 1 - s.left / FARM.cd) * 100) + '%';
   }
   function harvestFarm(x, y) {
     const s = farmState();
@@ -2331,21 +2557,131 @@ window.I18N = {
     return true;
   }
 
+  /* ---------------- 자리 배치 모드 ---------------- */
+  let placeMode = false;
+
+  function canvasPoint(ev) {
+    const box = ranch.cv.getBoundingClientRect();
+    return { x: ev.clientX - box.left, y: ev.clientY - box.top };
+  }
+
+  function horseAt(x, y) {
+    let best = null, bestD = 1e9;
+    for (const h of state.horses) {
+      if (h._x == null) continue;
+      const dx = (x - h._x) / (h._h * 0.66);
+      const dy = (y - (h._y - h._h * 0.45)) / (h._h * 0.62);
+      const d = dx * dx + dy * dy;
+      if (d < 1.6 && d < bestD) { best = h; bestD = d; }
+    }
+    return best;
+  }
+
+  function setPlaceMode(on) {
+    placeMode = !!on;
+    const scr = $('screen-ranch');
+    if (scr) scr.classList.toggle('placing', placeMode);
+    const bar = $('place-bar');
+    if (bar) bar.classList.toggle('on', placeMode);
+    const pb = $('place-fab');
+    if (pb) pb.classList.toggle('on', placeMode);
+    hideChip();
+    ranch.placeSel = null;
+    ranch.drag = null;
+    if (placeMode) {
+      const hint = $('place-bar-hint');
+      if (hint) hint.textContent = t('placeHint');
+    } else {
+      if (state.herdCustom) { save(); }
+    }
+  }
+
+  function beginPlaceDrag(ev) {
+    const p = canvasPoint(ev);
+    const h = horseAt(p.x, p.y);
+    if (!h) { ranch.placeSel = null; return; }
+    ranch.drag = { id: h.id, moved: false, x0: p.x, y0: p.y };
+    ranch.placeSel = h.id;
+    movePlaceDrag(ev);
+  }
+
+  function movePlaceDrag(ev) {
+    const d = ranch.drag;
+    if (!d) return;
+    const h = state.horses.find(x => x.id === d.id);
+    if (!h) return;
+    const p = canvasPoint(ev);
+    if (!d.moved && Math.hypot(p.x - d.x0, p.y - d.y0) > 6) d.moved = true;
+    if (!d.moved) return;
+    const pos = placeClamp(h, p.x / ranch.w, (p.y / ranch.h - 0.55) / 0.34);
+    h.px = pos.px; h.py = pos.py;
+    h.facing = p.x < ranch.w / 2 ? 1 : -1;
+  }
+
+  function endPlaceDrag() {
+    const d = ranch.drag;
+    ranch.drag = null;
+    if (!d) return;
+    const h = state.horses.find(x => x.id === d.id);
+    if (!h) return;
+    if (d.moved) {
+      h._custom = true;
+      state.herdCustom = true;
+      h._joyAt = 0;
+      queueSave();
+      return;
+    }
+    // 움직이지 않았다면 탭: 두 마리를 차례로 골라 자리 바꾸기
+    if (ranch.swapId && ranch.swapId !== h.id) {
+      const other = state.horses.find(x => x.id === ranch.swapId);
+      if (other) {
+        const px = other.px, py = other.py, f = other.facing;
+        const pos = placeClamp(other, h.px, h.py);
+        other.px = pos.px; other.py = pos.py; other.facing = h.facing; other._custom = true;
+        const pos2 = placeClamp(h, px, py);
+        h.px = pos2.px; h.py = pos2.py; h.facing = f; h._custom = true;
+        state.herdCustom = true;
+        toast(t('placeSwapped'));
+        queueSave();
+      }
+      ranch.swapId = null;
+      ranch.placeSel = null;
+    } else {
+      ranch.swapId = h.id;
+      ranch.placeSel = h.id;
+    }
+  }
+
+  function autoPlaceHerd() {
+    state.herdCustom = false;
+    state.horses.forEach(h => { h._custom = false; });
+    ranch.placeSel = null;
+    ranch.swapId = null;
+    ranch.drag = null;
+    layoutHerd(true);
+    save();
+    toast(t('placeAutoDone'));
+  }
+
   function tapRanch(ev) {
     const cv = $('ranch-canvas');
     const box = cv.getBoundingClientRect();
     const x = ev.clientX - box.left, y = ev.clientY - box.top;
     if (inFarm(x, y)) { hideChip(); harvestFarm(x, y); return; }
-    let best = null, bestD = 1e9;
-    for (const h of state.horses) {
-      if (h._x == null) continue;
-      const dx = (x - h._x) / (h._h * 0.62);
-      const dy = (y - (h._y - h._h * 0.45)) / (h._h * 0.62);
-      const d = dx * dx + dy * dy;
-      if (d < 1.5 && d < bestD) { best = h; bestD = d; }
-    }
+    const best = horseAt(x, y);
     if (best) petHorse(best, x, y);
     else hideChip();
+  }
+
+  // 자리 배치 모드에서는 드래그·탭으로 말을 옴기고, 평소에는 쓰다듬기
+  function onCanvasDown(ev) {
+    if (!ranch.ready) return;
+    if (placeMode) {
+      if (ev.cancelable) ev.preventDefault();
+      beginPlaceDrag(ev);
+      return;
+    }
+    tapRanch(ev);
   }
 
   function petHorse(h, x, y) {
@@ -2395,8 +2731,11 @@ window.I18N = {
   function flushGiftToast() {
     if (!pendingGift) return;
     const g = pendingGift;
-    pendingGift = 0;
-    setTimeout(() => toast(t('giftToast', { n: g })), 800);
+    pendingGift = null;
+    setTimeout(() => {
+      if (g.gold > 0) toast(t('giftV4Toast', { g: g.gold.toLocaleString(), n: g.carrots }));
+      else toast(t('giftToast', { n: g.carrots }));
+    }, 800);
   }
 
   /* ---------------- 말 상세 ---------------- */
@@ -2735,6 +3074,10 @@ window.I18N = {
       morph: egg.morph, aura: egg.aura, gen: egg.gen,
       px: rand(0.15, 0.85), py: rand(0.62, 0.9), seed: egg.seed
     });
+    if (state.herdCustom) {
+      const spot = freeSpot(horse);
+      horse.px = spot[0]; horse.py = spot[1]; horse._custom = true;
+    }
     state.horses.push(horse);
     const fresh = markDiscovery(horse);
     state.stats.born++;
@@ -3290,6 +3633,10 @@ window.I18N = {
     $('hc-open').textContent = t('chipOpen');
     const sf = $('shop-fab-label'); if (sf) sf.textContent = t('shopBtn');
     const fl = $('farm-btn-label'); if (fl) fl.textContent = t('farmName');
+    const pl = $('place-fab-label'); if (pl) pl.textContent = t('placeBtn');
+    const pa = $('place-auto'); if (pa) pa.textContent = t('placeAuto');
+    const pd = $('place-done'); if (pd) pd.textContent = t('placeDone');
+    const ph = $('place-bar-hint'); if (ph) ph.textContent = t('placeHint');
     updateFarmBtn();
   }
 
@@ -3331,8 +3678,30 @@ window.I18N = {
     $('sheet-backdrop').onclick = closeSheet;
 
     const cv = $('ranch-canvas');
-    cv.addEventListener('pointerdown', tapRanch, { passive: true });
+    cv.addEventListener('pointerdown', onCanvasDown, { passive: false });
+    window.addEventListener('pointermove', (ev) => { if (ranch.drag) { if (ev.cancelable) ev.preventDefault(); movePlaceDrag(ev); } }, { passive: false });
+    window.addEventListener('pointerup', () => { if (ranch.drag) endPlaceDrag(); });
+    window.addEventListener('pointercancel', () => { if (ranch.drag) endPlaceDrag(); });
+
+    const pf = $('place-fab');
+    if (pf) pf.onclick = () => setPlaceMode(!placeMode);
+    const pa = $('place-auto');
+    if (pa) pa.onclick = autoPlaceHerd;
+    const pd = $('place-done');
+    if (pd) pd.onclick = () => { setPlaceMode(false); toast(t('placedDone')); };
+
     setInterval(() => { if (state.tab === 'ranch') updateFarmBtn(); }, 500);
+    // 아이폰 주소창 접힘·회전·앱 복귀에서도 캔버스 크기를 계속 맞춘다
+    setInterval(syncScene, 700);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => setTimeout(syncScene, 60));
+      window.visualViewport.addEventListener('scroll', () => setTimeout(syncScene, 120));
+    }
+    window.addEventListener('orientationchange', () => setTimeout(syncScene, 220));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(syncScene, 120); });
+    if (window.ResizeObserver) {
+      try { new ResizeObserver(() => syncScene()).observe($('screen-ranch')); } catch (e) {}
+    }
 
     window.addEventListener('resize', () => {
       if (state.tab === 'ranch') buildScene();
