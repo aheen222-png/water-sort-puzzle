@@ -4469,8 +4469,8 @@ window.I18N = {
 
     // 확대/축소 버튼
     const zo = $('zoom-out'), zi = $('zoom-in'), zr = $('zoom-reset');
-    if (zo) zo.onclick = () => setZoom(ranch.cam.z / 1.28);
-    if (zi) zi.onclick = () => setZoom(ranch.cam.z * 1.28);
+    if (zo) zo.onclick = () => setZoom(ranch.cam.z / 1.22);
+    if (zi) zi.onclick = () => setZoom(ranch.cam.z * 1.22);
     if (zr) zr.onclick = () => resetCam();
     updateZoomUI();
 
