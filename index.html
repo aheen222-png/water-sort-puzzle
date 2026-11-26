@@ -2826,7 +2826,7 @@ window.I18N = {
   const MAX_SLOTS = GRID.cols * GRID.rows;          // 25
 
   // 뒤로 갈수록 아주 조금만 작게 (원근)
-  const horseH = (v) => ranch.h * (0.088 - 0.006 * clamp(v, 0, 1));
+  const horseH = (v) => ranch.h * (0.094 - 0.006 * clamp(v, 0, 1));
 
   // 25칸 격자: 줄마다 다섯 칸. STAGGER 를 켜면 한 줄 건너 반 칸씩 어긋난다.
   function slotUV(r, c) {
