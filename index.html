@@ -2988,6 +2988,8 @@ window.I18N = {
     const dt = Math.min(0.05, (ts - (ranch.last || ts)) / 1000);
     ranch.last = ts;
     ranch.time += dt;
+    // 먼저 화면 크기를 맞춘다(필요하면 캔버스를 다시 만든다) — 변환 적용 전에 해야 한다
+    syncScene();
     const { ctx, w, h } = ranch;
     const cm = ranch.cam;
     // 전체 지우기(변환과 무관하게 캔버스 전폭) → 카메라 변환 → 목장 그리기
@@ -3007,7 +3009,6 @@ window.I18N = {
     }
 
     // 말은 제자리에서 차분하게 숨만 쉼 (이동 없음)
-    syncScene();
     layoutHerd(false);
     for (const horse of state.horses) {
       horse.phase = (horse.phase || 0) + dt * (1.35 + (horse.pace || 1) * 0.45);
