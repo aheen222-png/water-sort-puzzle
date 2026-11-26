@@ -1371,12 +1371,6 @@ window.I18N = {
     ctx.restore();
   }
 
-  /* ---------- 날개 · 뿔 (품종에 날개가 없으면 합성한다) ---------- */
-  function shade(hex, k) {
-    const c = hexRGB(hex);
-    const f = (v) => Math.max(0, Math.min(255, k <= 1 ? v * k : v + (255 - v) * (k - 1)));
-    return 'rgb(' + Math.round(f(c[0])) + ',' + Math.round(f(c[1])) + ',' + Math.round(f(c[2])) + ')';
-  }
   function rgbOf(c) {
     if (typeof c === 'string' && c.charAt(0) === '#') return hexRGB(c);
     const m = /rgba?\(([^)]+)\)/.exec(c || '');
@@ -2834,7 +2828,7 @@ window.I18N = {
   // 뒤로 갈수록 아주 조금만 작게 (원근)
   const horseH = (v) => ranch.h * (0.088 - 0.006 * clamp(v, 0, 1));
 
-  // 한 줄 건너 반 칸씩 어긋나게(벽돌쌓기) 놓는다 — 25마리도 서로 가리지 않고 보인다.
+  // 25칸 격자: 줄마다 다섯 칸. STAGGER 를 켜면 한 줄 건너 반 칸씩 어긋난다.
   function slotUV(r, c) {
     return {
       u: U_CENTER + (c - (GRID.cols - 1) / 2) * GRID_U + (STAGGER && (r % 2) ? GRID_U * 0.5 : 0),
