@@ -3293,7 +3293,9 @@ window.I18N = {
     return '<img src="' + src + '" alt="">';
   }
   function variantLine(h) {
-    const bits = [morphName(h.morph || 'normal') + ' ' + breedName(h.breed)];
+    const mn = morphName(h.morph || 'normal'), bn = breedName(h.breed);
+    // '장밋빛 장밋빛 포니'처럼 같은 말이 겹치지 않게
+    const bits = [bn.indexOf(mn) === 0 ? bn : mn + ' ' + bn];
     if (h.aura && h.aura !== 'none') bits.push(auraName(h.aura));
     return bits.join(' · ');
   }
