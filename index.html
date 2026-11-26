@@ -2856,8 +2856,10 @@ window.I18N = {
       ? { wing: 'fairy', mane: 'gold', horn: 'none', legs: true }
       : { wing: 'feather', mane: 'mint', horn: 'unicorn', legs: true };
     const spot = freeSpot();
+    const wantName = isRose ? { ko: '노을', en: 'Dusk' } : { ko: '이슬', en: 'Dew' };
+    const nameDup = state.horses.some(x => x.name && x.name.ko === wantName.ko);
     const h = makeHorse(breed, {
-      name: isRose ? { ko: '노을', en: 'Dusk' } : { ko: '이슬', en: 'Dew' },
+      name: nameDup ? nameFor(state.horses) : wantName,
       morph, aura, gen: 3, level: 3, cos,
       px: spot[0], py: spot[1]
     });
