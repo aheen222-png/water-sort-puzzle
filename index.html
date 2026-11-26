@@ -2844,10 +2844,11 @@ window.I18N = {
     if (state.giftLegendaryV1) return false;
     const count = (b) => state.horses.filter(h => h.breed === b).length;
     const breed = count('rosegold_pegasus') > 0 && count('emerald_fairy') === 0 ? 'emerald_fairy' : 'rosegold_pegasus';
-    if (state.horses.length >= state.slots) {
-      if (state.slots >= MAX_SLOTS) return false;   // 만석이면 자리가 날 때 다시 준다(플래그는 남겨 둔다)
-      state.slots = Math.min(MAX_SLOTS, state.slots + 1);
+    if (state.horses.length + 1 >= state.slots) {
+      // 선물한 말이 들어가고도 알을 한 개 더 둘 빈자리가 남도록 마구간을 넓혀 둔다
+      state.slots = Math.min(MAX_SLOTS, state.horses.length + 2);
     }
+    if (state.horses.length >= state.slots) return false;   // 만석이면 자리가 날 때 다시 준다(플래그는 남겨 둔다)
     const isRose = breed === 'rosegold_pegasus';
     const morph = isRose ? 'rose' : 'emerald';
     const aura = 'stardust';
