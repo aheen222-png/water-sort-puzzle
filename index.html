@@ -3007,6 +3007,7 @@ window.I18N = {
     if (!state.seen.includes(breed)) state.seen.push(breed);
     if (!state.seenMorphs.includes(morph)) state.seenMorphs.push(morph);
     if (!state.seenAuras.includes(aura)) state.seenAuras.push(aura);
+    addCodex(breed, morph);
     const ck = comboKey(h);
     if (!state.combos.includes(ck)) state.combos.push(ck);
     state.giftLegendaryV1 = true;
